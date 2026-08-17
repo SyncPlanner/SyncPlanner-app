@@ -1,0 +1,56 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gb" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E1C45"/>
+      <stop offset="100%" style="stop-color:#0F0E1A"/>
+    </linearGradient>
+    <linearGradient id="gw" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#C4B5FD"/>
+      <stop offset="100%" style="stop-color:#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="ga" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA"/>
+      <stop offset="100%" style="stop-color:#4C1D95"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond -->
+  <rect x="0" y="0" width="1024" height="1024" rx="220" fill="url(#gb)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="220" fill="none" stroke="#7C3AED" stroke-width="4" opacity="0.4"/>
+
+  <!-- Coins déco -->
+  <path d="M120 200 L120 120 L200 120" fill="none" stroke="#7C3AED" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <path d="M824 120 L904 120 L904 200" fill="none" stroke="#7C3AED" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <path d="M120 824 L120 904 L200 904" fill="none" stroke="#7C3AED" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <path d="M904 824 L904 904 L824 904" fill="none" stroke="#7C3AED" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Waveform — 5 barres -->
+  <rect x="288" y="440" width="36" height="180" rx="18" fill="url(#ga)" opacity="0.5"/>
+  <rect x="374" y="310" width="44" height="360" rx="22" fill="url(#gw)"/>
+  <rect x="490" y="240" width="52" height="430" rx="26" fill="url(#gw)"/>
+  <rect x="614" y="310" width="44" height="360" rx="22" fill="url(#gw)"/>
+  <rect x="708" y="440" width="36" height="180" rx="18" fill="url(#ga)" opacity="0.5"/>
+
+  <!-- Points accent -->
+  <circle cx="516" cy="224" r="18" fill="#C4B5FD"/>
+  <circle cx="396" cy="298" r="12" fill="#9D6FFF" opacity="0.8"/>
+  <circle cx="636" cy="298" r="12" fill="#9D6FFF" opacity="0.8"/>
+
+  <!-- Ligne base -->
+  <line x1="200" y1="730" x2="824" y2="730" stroke="#7C3AED" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- SYNC -->
+  <text x="512" y="820"
+    font-family="'Inter',-apple-system,BlinkMacSystemFont,sans-serif"
+    font-size="120" font-weight="700" letter-spacing="-2"
+    text-anchor="middle" fill="#F0F0FF">SYNC</text>
+
+  <!-- Ligne séparatrice -->
+  <line x1="300" y1="840" x2="724" y2="840" stroke="#7C3AED" stroke-width="2" opacity="0.4"/>
+
+  <!-- PLANNER -->
+  <text x="512" y="900"
+    font-family="'Inter',-apple-system,BlinkMacSystemFont,sans-serif"
+    font-size="56" font-weight="400" letter-spacing="14"
+    text-anchor="middle" fill="#A78BFA">PLANNER</text>
+</svg>
