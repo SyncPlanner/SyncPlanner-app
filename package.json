@@ -1,6 +1,6 @@
 {
   "name": "sync-planner",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "SYNC.PLANNER — Composer Manager",
   "main": "main.js",
   "scripts": {
@@ -55,7 +55,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "asar": false
   },
   "devDependencies": {
     "electron": "^42.4.0",
