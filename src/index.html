@@ -203,6 +203,9 @@ button{cursor:pointer}
 }
 .stat-tooltip-wrap:hover::after{opacity:1}
 .kanban-card:hover{border-color:#5B4FA0;box-shadow:0 2px 12px rgba(0,0,0,0.3)}
+@keyframes liveLogicPulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,0.5)}70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.live-logic-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#34D399;animation:liveLogicPulse 1.6s infinite;flex-shrink:0}
+.live-logic-highlight{box-shadow:0 0 0 1px rgba(52,211,153,0.7),0 0 14px rgba(52,211,153,0.3) !important}
 .kanban-card.dragging{opacity:0.4}
 .kanban-card-title{font-size:11px;font-weight:600;color:#E2E0F0;margin-bottom:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .kanban-card-proj{font-size:9px;color:#5B5880;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -343,7 +346,7 @@ select.inp option{background:#1A1838}
     <div class="topbar-actions">
       <div class="search-wrap">
         <span class="search-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B5880" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M21 21l-4.35-4.35"/></svg></span>
-        <input class="search-input" id="search-input" placeholder="Rechercher track, album, éditeur…" oninput="handleSearch(this.value)" onblur="setTimeout(()=>closeSearch(),200)">
+        <input class="search-input" id="search-input" placeholder="Rechercher track, album, éditeur…" oninput="debouncedHandleSearch(this.value)" onblur="setTimeout(()=>closeSearch(),200)">
         <div class="search-results" id="search-results" style="display:none"></div>
       </div>
       <button class="btn" onclick="openBriefing()" title="Briefing IA — analyse de tes projets" style="background:#1A1038;border-color:#7C3AED;color:#C4B5FD;font-weight:700"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M12 2l1.5 3.5L17 7l-3.5 1.5L12 12l-1.5-3.5L7 7l3.5-1.5Z"/></svg> Briefing</button>
@@ -433,6 +436,9 @@ select.inp option{background:#1A1838}
     <div style="padding:24px">
       <div id="alert-banner"></div>
       <div id="logic-sync-banner"></div>
+      <div style="text-align:right;margin:-6px 0 10px">
+        <span onclick="manualDetectLogicProject()" style="font-size:11px;color:#5B5880;cursor:pointer;text-decoration:underline" id="ui-logic-manual-detect"></span>
+      </div>
       <div class="stat-grid" id="dash-stats"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
         <div class="chart-wrap" id="dash-chart" style="margin-bottom:0"></div>
@@ -537,6 +543,10 @@ select.inp option{background:#1A1838}
           <!-- Filtre éditeur -->
           <select class="btn" id="proj-pub-filter" onchange="renderProjects()" style="padding:6px 10px;font-size:11px">
             <option value="">Tous les éditeurs</option>
+          </select>
+          <!-- Filtre année (deadline) -->
+          <select class="btn" id="proj-year-filter" onchange="renderProjects()" style="padding:6px 10px;font-size:11px">
+            <option value="" id="ui-proj-all-years">Toutes les années</option>
           </select>
           <button class="btn btn-primary" onclick="openNewProjectModal()" style="white-space:nowrap">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -729,7 +739,7 @@ select.inp option{background:#1A1838}
 
   <!-- SACEM PAGE -->
   <div class="page" id="page-sacem">
-    <div style="padding:24px;max-width:900px;margin:0 auto">
+    <div style="padding:24px;max-width:1800px;margin:0 auto">
       <div class="section-hdr" style="margin-bottom:8px">
         <div class="section-title"><span id="ui-sacem-title">Revenus SACEM</span><span style="font-size:9px;font-weight:800;letter-spacing:0.05em;color:#FBBF24;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.35);border-radius:5px;padding:2px 6px;margin-left:8px;vertical-align:middle">BETA</span></div>
         <button class="btn btn-primary" onclick="importSacemFolder()">
@@ -740,44 +750,102 @@ select.inp option{background:#1A1838}
       <div style="font-size:11px;color:#7B78A8;margin-bottom:16px" id="ui-sacem-beta-notice">Module en bêta : le matching automatique et les calculs vont continuer à s'affiner au fil des prochaines mises à jour.</div>
       <div id="sacem-status" style="font-size:12px;color:#5B5880;margin-bottom:16px"></div>
 
-      <!-- Doublons de titres détectés dans le catalogue -->
+      <!-- Doublons de titres détectés dans le catalogue — toujours visible, tous onglets confondus : ça affecte la fiabilité du matching -->
       <div id="sacem-duplicates-card" style="display:none;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.3);border-radius:12px;padding:16px 20px;margin-bottom:20px">
         <div style="font-size:12px;font-weight:700;color:#F87171;margin-bottom:6px;display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg><span id="ui-sacem-duplicates-title">Titres en double détectés</span></div>
         <div style="font-size:11px;color:#7B78A8;margin-bottom:10px" id="ui-sacem-duplicates-desc">Ces tracks portent le même nom dans ton catalogue — le matching automatique SACEM refusera de choisir entre elles pour éviter d'attribuer des revenus à la mauvaise track. Renomme-les (ex: ajouter l'album) si ce n'est pas volontaire.</div>
         <div id="sacem-duplicates-list"></div>
       </div>
 
-      <!-- Résumé -->
-      <div id="sacem-summary" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px" id="ui-sacem-summary-title">Résumé</div>
-        <div id="sacem-summary-content"></div>
+      <!-- Onglets — pour éviter d'empiler toutes les sections (résumé, rentabilité,
+           imports/lignes à traiter) sur une seule page interminable -->
+      <div style="display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid #2A2750">
+        <button class="sacem-tab-btn active" id="sacem-tab-btn-overview" onclick="switchSacemTab('overview')" style="background:transparent;border:none;border-bottom:2px solid #A78BFA;color:#F0EEF8;font-size:13px;font-weight:700;padding:10px 16px;cursor:pointer"><span id="ui-sacem-tab-overview">Aperçu</span></button>
+        <button class="sacem-tab-btn" id="sacem-tab-btn-profit" onclick="switchSacemTab('profit')" style="background:transparent;border:none;border-bottom:2px solid transparent;color:#7B78A8;font-size:13px;font-weight:700;padding:10px 16px;cursor:pointer"><span id="ui-sacem-tab-profit">Rentabilité</span></button>
+        <button class="sacem-tab-btn" id="sacem-tab-btn-data" onclick="switchSacemTab('data')" style="background:transparent;border:none;border-bottom:2px solid transparent;color:#7B78A8;font-size:13px;font-weight:700;padding:10px 16px;cursor:pointer"><span id="ui-sacem-tab-data">Données &amp; imports</span><span id="sacem-tab-badge-data" style="display:none;margin-left:6px;font-size:10px;font-weight:800;background:#451A03;color:#FB923C;border-radius:100px;padding:1px 7px;vertical-align:middle"></span></button>
       </div>
 
-      <!-- Temps investi vs revenus (Logic Pro x SACEM) -->
-      <div id="sacem-roi-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;color:#60A5FA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-roi-title">Temps investi vs revenus</div>
-        <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-roi-desc">Croise le temps passé sur Logic Pro et le revenu SACEM annuel moyen par track (annualisé pour ne pas avantager les tracks anciennes). Le temps n'est suivi que depuis peu — les tracks plus anciennes n'auront pas de temps enregistré même si elles rapportent.</div>
-        <div id="sacem-roi-list"></div>
+      <!-- Onglet Aperçu -->
+      <div id="sacem-tab-content-overview">
+        <!-- Rentabilité par album, en grille visuelle avec covers -->
+        <div id="sacem-album-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+            <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em" id="ui-sacem-album-title">Rentabilité par album</div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7B78A8;cursor:pointer;white-space:nowrap">
+              <input type="checkbox" id="sacem-hide-no-revenue" onchange="toggleSacemHideNoRevenue(this.checked)">
+              <span id="ui-sacem-hide-no-revenue">Masquer les albums sans revenu</span>
+            </label>
+          </div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-album-desc">Revenu SACEM et temps Logic Pro cumulés par album, tous les tracks confondus. Clique sur un album pour voir le détail par track et par année.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+            <div id="sacem-album-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;align-content:start"></div>
+            <div style="position:sticky;top:10px;display:flex;flex-direction:column;gap:16px">
+              <div id="sacem-album-globalstats" style="background:#13122A;border:1px solid #2A2750;border-radius:12px;padding:22px"></div>
+              <div id="sacem-album-detail" style="display:none;background:#13122A;border:1px solid #2A2750;border-radius:12px;padding:26px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Évolution du catalogue (trimestre x année) -->
+        <div id="sacem-evolution-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-evolution-title">Évolution du catalogue</div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-evolution-desc">Total NET perçu par trimestre (regroupé par année quand le trimestre exact n'est pas identifiable dans le relevé), tous imports actifs confondus — indépendant du matching par track.</div>
+          <div id="sacem-evolution-list"></div>
+          <div style="font-size:10px;color:#5B5880;margin-top:12px" id="ui-sacem-evolution-lag-notice">Les versements SACEM reflètent des diffusions d'il y a 12 à 24 mois (parfois plus à l'international) — une hausse ou baisse ici correspond à une période antérieure, pas à l'activité actuelle.</div>
+        </div>
+
+        <!-- Résumé -->
+        <div id="sacem-summary" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px" id="ui-sacem-summary-title">Résumé</div>
+          <div id="sacem-summary-content"></div>
+        </div>
       </div>
 
-      <!-- Imports -->
-      <div id="sacem-imports-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px" id="ui-sacem-imports-title">Relevés importés</div>
-        <div id="sacem-imports-list"></div>
+      <!-- Onglet Rentabilité -->
+      <div id="sacem-tab-content-profit" style="display:none">
+        <!-- Temps investi vs revenus (Logic Pro x SACEM) -->
+        <div id="sacem-roi-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#60A5FA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-roi-title">Temps investi vs revenus</div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-roi-desc">Croise le temps passé sur Logic Pro et le revenu SACEM annuel moyen par track (annualisé pour ne pas avantager les tracks anciennes). Le temps n'est suivi que depuis peu — les tracks plus anciennes n'auront pas de temps enregistré même si elles rapportent.</div>
+          <div id="sacem-roi-list"></div>
+        </div>
+
+        <!-- Rentabilité par éditeur (Logic Pro x SACEM) -->
+        <div id="sacem-editeur-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-editeur-title">Rentabilité par éditeur</div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-editeur-desc">Moyenne du €/h/an par éditeur, pour voir avec qui ton temps investi est le mieux valorisé.</div>
+          <div id="sacem-editeur-list"></div>
+        </div>
+
+        <!-- Rentabilité par mood (Logic Pro x SACEM) -->
+        <div id="sacem-mood-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#7B78A8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-mood-title">Rentabilité par mood</div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-mood-desc">Complément indicatif — l'échantillon par mood est souvent trop réduit et le décalage de versement SACEM trop long pour en tirer une vraie tendance. À lire comme une piste, pas une conclusion.</div>
+          <div id="sacem-mood-list"></div>
+        </div>
       </div>
 
-      <!-- Lignes à valider manuellement -->
-      <div id="sacem-review-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;color:#FB923C;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-review-title">À relier manuellement</div>
-        <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-review-desc">Ces lignes n'ont pas été reliées automatiquement à une track — choisis la bonne, ou ignore si ce n'est pas une œuvre suivie dans SyncPlanner.</div>
-        <div id="sacem-review-list"></div>
-      </div>
+      <!-- Onglet Données & imports -->
+      <div id="sacem-tab-content-data" style="display:none">
+        <!-- Imports -->
+        <div id="sacem-imports-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px" id="ui-sacem-imports-title">Relevés importés</div>
+          <div id="sacem-imports-list"></div>
+        </div>
 
-      <!-- Lignes reliées -->
-      <div id="sacem-matched-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-matched-title">Lignes reliées</div>
-        <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-matched-desc">Track liée pour chaque entrée — clique "Délier" si le rapprochement automatique s'est trompé.</div>
-        <div id="sacem-matched-list"></div>
+        <!-- Lignes à valider manuellement -->
+        <div id="sacem-review-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#FB923C;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-review-title">À relier manuellement</div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-review-desc">Ces lignes n'ont pas été reliées automatiquement à une track — choisis la bonne, ou ignore si ce n'est pas une œuvre suivie dans SyncPlanner.</div>
+          <div id="sacem-review-list"></div>
+        </div>
+
+        <!-- Lignes reliées -->
+        <div id="sacem-matched-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-matched-title">Lignes reliées</div>
+          <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-matched-desc">Track liée pour chaque entrée — clique "Délier" si le rapprochement automatique s'est trompé.</div>
+          <div id="sacem-matched-list"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -942,18 +1010,19 @@ select.inp option{background:#1A1838}
 
       <!-- Suggestions rapides -->
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="quickAI('deadlines')" id="ui-ai-q1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Mes deadlines urgentes</span></button>
-        <button class="btn btn-sm" onclick="quickAI('stats')" id="ui-ai-q2"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Analyse mes stats</span></button>
-        <button class="btn btn-sm" onclick="quickAI('advice')" id="ui-ai-q3"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.7-3.3 6H8.3A7 7 0 0 1 12 2z"/></svg><span>Conseils du jour</span></button>
-        <button class="btn btn-sm" onclick="quickAI('recycling')" id="ui-ai-q4"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg><span>Tracks à recycler</span></button>
-        <button class="btn btn-sm" onclick="quickAI('veille')" id="ui-ai-q5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>Veille Sync</span></button>
-        <button class="btn btn-sm" onclick="quickAI('moods')" id="ui-ai-q6"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>Moods tendance</span></button>
-        <button class="btn btn-sm" onclick="quickAI('risks')" id="ui-ai-q7"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Analyse des risques</span></button>
-        <button class="btn btn-sm" onclick="quickAI('report')" id="ui-ai-q8"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Rapport semaine</span></button>
-        <button class="btn btn-sm" onclick="quickAI('today')" id="ui-ai-q9"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>Que faire aujourd'hui ?</span></button>
-        <button class="btn btn-sm" onclick="quickAI('blocked')" id="ui-ai-q10"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5B5880" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Tracks bloquées</span></button>
-        <button class="btn btn-sm" onclick="quickAI('memory')" id="ui-ai-q11"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg><span>Ma mémoire</span></button>
-        <button class="btn btn-sm" onclick="quickAI('predict')" id="ui-ai-q12"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="#10B981" stroke="none"/></svg><span>Prédire ma deadline</span></button>
+        <button class="btn btn-sm" onclick="quickAI('deadlines')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span id="ui-ai-q1">Mes deadlines urgentes</span></button>
+        <button class="btn btn-sm" onclick="quickAI('stats')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span id="ui-ai-q2">Analyse mes stats</span></button>
+        <button class="btn btn-sm" onclick="quickAI('advice')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.7-3.3 6H8.3A7 7 0 0 1 12 2z"/></svg><span id="ui-ai-q3">Conseils du jour</span></button>
+        <button class="btn btn-sm" onclick="quickAI('recycling')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg><span id="ui-ai-q4">Tracks à recycler</span></button>
+        <button class="btn btn-sm" onclick="quickAI('veille')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span id="ui-ai-q5">Veille Sync</span></button>
+        <button class="btn btn-sm" onclick="quickAI('moods')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span id="ui-ai-q6">Moods tendance</span></button>
+        <button class="btn btn-sm" onclick="quickAI('risks')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span id="ui-ai-q7">Analyse des risques</span></button>
+        <button class="btn btn-sm" onclick="quickAI('report')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span id="ui-ai-q8">Rapport semaine</span></button>
+        <button class="btn btn-sm" onclick="quickAI('today')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span id="ui-ai-q9">Que faire aujourd'hui ?</span></button>
+        <button class="btn btn-sm" onclick="quickAI('blocked')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5B5880" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span id="ui-ai-q10">Tracks bloquées</span></button>
+        <button class="btn btn-sm" onclick="quickAI('memory')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg><span id="ui-ai-q11">Ma mémoire</span></button>
+        <button class="btn btn-sm" onclick="quickAI('predict')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="#10B981" stroke="none"/></svg><span id="ui-ai-q12">Prédire ma deadline</span></button>
+        <button class="btn btn-sm" onclick="quickAI('profitability')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span id="ui-ai-q13">Mes tracks les plus rentables</span></button>
       </div>
     </div>
   </div>
@@ -1505,6 +1574,13 @@ const TRANSLATIONS = {
     // Revenus SACEM
     sacem_title:"Revenus SACEM",
     sacem_import_btn:"Importer un dossier de relevés",
+    sacem_evolution_title:"Évolution du catalogue",
+    sacem_evolution_desc:"Total NET perçu par trimestre (regroupé par année quand le trimestre exact n'est pas identifiable dans le relevé), tous imports actifs confondus — indépendant du matching par track.",
+    sacem_evolution_lag_notice:"Les versements SACEM reflètent des diffusions d'il y a 12 à 24 mois (parfois plus à l'international) — une hausse ou baisse ici correspond à une période antérieure, pas à l'activité actuelle.",
+    sacem_evolution_empty:"Pas encore assez de relevés importés pour tracer une évolution.",
+    sacem_evolution_vs_prev:"vs",
+    sacem_evolution_same_period:"même période l'an dernier",
+    sacem_evolution_partial_data:"{n} import(s) plus ancien(s) ne contribue(nt) pas encore à ce graphique — réimporte-les pour les inclure.",
     sacem_summary_title:"Résumé",
     sacem_imports_title:"Relevés importés",
     sacem_review_title:"À relier manuellement",
@@ -1557,7 +1633,30 @@ const TRANSLATIONS = {
     sacem_roi_no_revenue:"Pas encore de revenu",
     sacem_roi_empty:"Aucune track avec du temps Logic ET des revenus SACEM pour l'instant.",
     sacem_beta_notice:"Module en bêta : le matching automatique et les calculs vont continuer à s'affiner au fil des prochaines mises à jour.",
+    sacem_mood_title:"Rentabilité par mood", sacem_mood_desc:"Complément indicatif — l'échantillon par mood est souvent trop réduit et le décalage de versement SACEM trop long pour en tirer une vraie tendance. À lire comme une piste, pas une conclusion.",
+    sacem_mood_none:"Sans mood", sacem_mood_track:" track", sacem_mood_tracks:" tracks",
+    sacem_mood_empty:"Aucune track avec du temps ET des revenus pour calculer ça pour l'instant.",
+    sacem_mood_solo_hint:"Chaque mood pris séparément — une track \"Action + Epic\" compte dans les deux groupes \"Action\" et \"Epic\".",
+    sacem_mood_see_combo:"Voir le détail par combinaison exacte",
+    sacem_mood_combo_caveat:"Attention, {n} de ces combinaisons ne reposent que sur une seule track — à prendre avec des pincettes.",
+    sacem_editeur_roi_title:"Rentabilité par éditeur", sacem_editeur_roi_desc:"Moyenne du €/h/an par éditeur, pour voir avec qui ton temps investi est le mieux valorisé.",
+    sacem_no_editeur:"Sans éditeur",
+    sacem_album_title:"Rentabilité par album", sacem_album_desc:"Revenu SACEM et temps Logic Pro cumulés par album, tous les tracks confondus. Clique sur un album pour voir le détail par track et par année.",
+    sacem_hide_no_revenue:"Masquer les albums sans revenu",
+    sacem_album_empty_filtered:"Tous les albums suivis sont masqués (aucun n'a encore de revenu SACEM) — décoche \"Masquer les albums sans revenu\" pour les voir.",
+    sacem_album_empty:"Aucun album avec du temps ET des revenus pour calculer ça pour l'instant.",
+    sacem_album_no_track_detail:"Aucune track reliée pour cet album pour l'instant.",
+    sacem_album_no_track_year:"Aucune track n'a rapporté sur cette année pour cet album.",
+    sacem_album_year_total:"Total",
+    sacem_album_since:"Depuis",
+    sacem_album_edit_date_hint:"Corriger la date réelle si besoin",
+    sacem_album_global_title:"Vue d'ensemble", sacem_album_global_total:"Total SACEM",
+    sacem_album_global_time:"Temps Logic cumulé", sacem_album_global_albums:"Albums suivis",
+    sacem_album_global_tracks:"Tracks suivies",
+    sacem_album_global_shows:"Shows différents",
     sacem_roi_load_more:"Afficher 30 de plus",
+    sacem_roi_see_all:"Voir le classement complet",
+    sacem_tab_overview:"Aperçu", sacem_tab_profit:"Rentabilité", sacem_tab_data:"Données & imports",
     logic_banner_title:"Projet Logic Pro détecté",
     logic_banner_add_btn:"Ajouter le projet en cours",
     logic_modal_title:"Ajouter le projet Logic Pro",
@@ -1578,6 +1677,21 @@ const TRANSLATIONS = {
     logic_not_linked:"Pas encore liée à un projet Logic Pro",
     logic_link_btn:"Lier…",
     logic_link_conflict:"Ce projet Logic Pro est déjà lié à une autre track : ",
+    logic_manual_time_title:"Renseigner un temps manuellement", logic_manual_time_link:"Temps manuel",
+    logic_manual_time_estimate_tag:"estimation",
+    logic_manual_time_modal_title:"Temps passé sur cette track",
+    logic_manual_time_desc:"Une estimation approximative suffit — surtout utile pour une track composée avant l'existence du suivi automatique.",
+    logic_manual_time_hours:"Heures", logic_manual_time_minutes:"Minutes",
+    logic_manual_time_saved:"Temps enregistré",
+    logic_live_badge:"En cours dans Logic Pro",
+    logic_debug_check_btn:"Vérifier", logic_debug_check_title:"Vérifier la correspondance avec Logic Pro maintenant",
+    logic_debug_no_project:"Logic Pro n'a pas de projet ouvert détecté actuellement (vérifie qu'un projet est bien ouvert, et la permission Accessibilité de SYNC.PLANNER).",
+    logic_debug_match:"Le lien correspond bien au projet ouvert dans Logic Pro ✓", logic_debug_no_meta:"aucune métadonnée (BPM/clé) lue dans ce projet",
+    logic_debug_mismatch:"Le projet actuellement ouvert dans Logic Pro ne correspond pas au lien de cette track — c'est pour ça que rien ne se met à jour.",
+    logic_relink_autofix:"Dossier sélectionné au lieu du projet — correction automatique vers le .logicx trouvé à l'intérieur.",
+    logic_relink_wrong_pick:"Ce n'est pas un fichier .logicx — sélectionne bien le paquet .logicx du projet, pas le dossier qui le contient (à côté d'un export .mp3 par exemple).",
+    logic_manual_detect:"Actualiser la détection Logic Pro",
+    logic_manual_detect_none:"Aucun projet Logic Pro ouvert actuellement détecté.",
     logic_modal_link_existing:"Lier à une track existante",
     logic_modal_link_suggestion:"(suggestion trouvée)",
     logic_modal_link_placeholder:"Choisir une track…",
@@ -1734,11 +1848,19 @@ const TRANSLATIONS = {
     nav_publishers:"Éditeurs",
     pub_title:"Éditeurs", pub_search:"Rechercher un éditeur…",
     pub_all_years:"Toutes les années",
+    proj_all_years:"Toutes les années",
     pub_count:"Éditeurs", pub_validated:"Tracks validées",
     pub_rate:"Taux moyen", pub_waiting:"En attente retour",
     pub_breakdown_month:"Tracks par mois", pub_breakdown_year:"Tracks par année",
     pub_no_publisher:"Sans éditeur",
     pub_contact:"Coordonnées de l'éditeur", pub_add_info:"Ajouter infos", pub_no_contact:"Aucune coordonnée renseignée",
+    pub_sacem_title:"Revenus SACEM", pub_sacem_ai_btn:"Analyser avec l'IA", pub_sacem_ai_loading:"Analyse en cours…",
+    pub_sacem_total:"Total net", pub_sacem_avg_per_track:"Moy. / track (avec revenu)", pub_sacem_roi:"Rentabilité moy.",
+    pub_sacem_tracks_with_revenue:"tracks avec revenu",
+    pub_sacem_caution:"Le total dépend du nombre de tracks — compare plutôt la moyenne par track entre éditeurs.",
+    pub_sacem_total_tooltip:"Somme des montants nets SACEM perçus sur les tracks placées chez cet éditeur.",
+    pub_sacem_avg_tooltip:"Total net ÷ nombre de tracks ayant généré du revenu (les tracks à 0€ ne sont pas comptées).",
+    pub_sacem_roi_tooltip:"Rentabilité horaire annualisée : revenu SACEM annuel moyen ÷ temps passé sur Logic Pro (en heures)\nEx : 5,54€/h/an = ces tracks rapportent en moyenne 5,54€ par an, par heure passée dessus.\nPermet de comparer sans que l'ancienneté d'une track ne fausse le calcul (une vieille track a eu plus de temps pour cumuler des droits).",
     pc_contact:"Contact référent", pc_phone:"Téléphone", pc_address:"Adresse", pc_logo:"Logo",
     pc_logo_upload_btn:"Importer un fichier…", pc_logo_too_big:"Image trop lourde (max 1.5 Mo)", pc_logo_read_fail:"Impossible de lire ce fichier",
     pc_logo_fetching:"Récupération de l'image…", pc_logo_fetch_ok:"Image récupérée", pc_logo_fetch_fail:"Impossible de récupérer cette image — essaie \"Importer un fichier…\"",
@@ -1765,6 +1887,8 @@ const TRANSLATIONS = {
     briefing_more:"autres",
     briefing_album_relance:"album(s) sans réponse éditeur — relance urgente",
     briefing_track_relance:"track(s) sans réponse — relance recommandée",
+    briefing_tracks_waiting:"track sans réponse",
+    briefing_tracks_waiting_plural:"tracks sans réponse",
     briefing_days_no_reply:"j sans retour",
     date_set:"Définir", date_popup_cancel:"Annuler", date_popup_confirm:"Confirmer",
     relance_last:"Relance éditeur", relance_reply_btn:"Réponse reçue", relance_reset:"Réinitialiser",
@@ -1847,6 +1971,8 @@ const TRANSLATIONS = {
     relance_overdue:"Relancer ! ({n}j sans retour)",
     relance_ok:"✓ {n}j avant relance",
     relance_hint:"Renseigne le dernier contact",
+    relance_count_label:"Relance",
+    save_manual_toast:"Sauvegardé",
     // Stats nouveaux onglets
     stats_tab_year:"Par année", stats_tab_monthly:"Mensuel",
     stats_tab_collabs:"Collabs", stats_tab_total:"Total",
@@ -1950,7 +2076,7 @@ const TRANSLATIONS = {
     ai_q5:"Veille Sync", ai_q6:"Moods tendance",
     ai_q7:"Analyse des risques", ai_q8:"Rapport semaine",
     ai_q9:"Que faire aujourd'hui ?", ai_q10:"Tracks bloquées",
-    ai_q11:"Ma mémoire", ai_q12:"Prédire ma deadline",
+    ai_q11:"Ma mémoire", ai_q12:"Prédire ma deadline", ai_q13:"Mes tracks les plus rentables",
     ai_q3:"Conseils du jour", ai_q4:"Tracks à recycler",
     year_label:"Année :", cal_month:"Mois",
     goals_reached_short:"Objectif atteint !", goals_remaining:"encore à faire",
@@ -2016,6 +2142,23 @@ const TRANSLATIONS = {
       "C'est maintenant ou jamais. Tu sais quoi faire. 💪",
       "Allez, on lâche tout et on livre ! 🚀",
     ],
+    briefing_quotes:[
+      "« La musique donne une âme à nos cœurs et des ailes à la pensée. » — Platon",
+      "« Sans musique, la vie serait une erreur. » — Friedrich Nietzsche",
+      "« La musique exprime ce qui ne peut être dit et sur quoi il est impossible de rester silencieux. » — Victor Hugo",
+      "« La musique produit une sorte de plaisir dont la nature humaine ne peut se passer. » — Confucius",
+      "« La musique est une révélation plus haute que toute sagesse et toute philosophie. » — Beethoven",
+      "« Compose comme si personne n'allait l'écouter, mixe comme si tout le monde l'écoutait. » — Anonyme",
+      "« Le silence est aussi une note — apprends à l'écrire. » — Anonyme",
+      "« Chaque track refusée rapproche un peu plus de celle qui sera acceptée. » — Anonyme",
+      "« Un bon thème se fredonne ; un bon mix se ressent. » — Anonyme",
+      "« La patience est le tempo caché de toute carrière en sync. » — Anonyme",
+      "« On ne compose jamais seul·e : il y a toujours l'éditeur de demain qui écoute déjà. » — Anonyme",
+      "« Un·e compositeur·ice sans deadline est un·e compositeur·ice qui rêve encore. » — Anonyme",
+      "« La meilleure prise est souvent la troisième — pas la première, jamais la dixième. » — Anonyme",
+      "« Une bibliothèque musicale bien rangée vaut tous les talents du monde. » — Anonyme",
+      "« Le sync, c'est 10% d'inspiration et 90% de relances. » — Anonyme",
+    ],
   },
   en: {
     // Logic Pro Sync
@@ -2035,6 +2178,13 @@ const TRANSLATIONS = {
     // SACEM revenue
     sacem_title:"SACEM Revenue",
     sacem_import_btn:"Import a statements folder",
+    sacem_evolution_title:"Catalog trend",
+    sacem_evolution_desc:"Total NET received per quarter (grouped by year when the exact quarter can't be identified in the statement), across all active imports — independent of track-level matching.",
+    sacem_evolution_lag_notice:"SACEM payments reflect broadcasts from 12 to 24 months ago (sometimes more for international repertoire) — a rise or drop here corresponds to an earlier period, not current activity.",
+    sacem_evolution_empty:"Not enough statements imported yet to plot a trend.",
+    sacem_evolution_vs_prev:"vs",
+    sacem_evolution_same_period:"same period last year",
+    sacem_evolution_partial_data:"{n} older import(s) don't contribute to this chart yet — re-import them to include them.",
     sacem_summary_title:"Summary",
     sacem_imports_title:"Imported statements",
     sacem_review_title:"Needs manual linking",
@@ -2087,7 +2237,30 @@ const TRANSLATIONS = {
     sacem_roi_no_revenue:"No revenue yet",
     sacem_roi_empty:"No track has both Logic time AND SACEM revenue yet.",
     sacem_beta_notice:"Beta module: automatic matching and calculations will keep improving with future updates.",
+    sacem_mood_title:"Profitability by mood", sacem_mood_desc:"Indicative extra — the sample per mood is often too small and the SACEM payment lag too long to draw a real trend from it. Read it as a lead, not a conclusion.",
+    sacem_mood_none:"No mood", sacem_mood_track:" track", sacem_mood_tracks:" tracks",
+    sacem_mood_empty:"No track with both time AND revenue to calculate this yet.",
+    sacem_mood_solo_hint:"Each mood taken separately — a track tagged \"Action + Epic\" counts in both the \"Action\" and \"Epic\" groups.",
+    sacem_mood_see_combo:"See breakdown by exact combination",
+    sacem_mood_combo_caveat:"Heads up, {n} of these combinations rest on a single track — take them with a grain of salt.",
+    sacem_editeur_roi_title:"Profitability by publisher", sacem_editeur_roi_desc:"Average €/h/yr per publisher, to see which one gets the most value out of your time invested.",
+    sacem_no_editeur:"No publisher",
+    sacem_album_title:"Profitability by album", sacem_album_desc:"Cumulative SACEM revenue and Logic Pro time per album, across all its tracks. Click an album to see the per-track, per-year breakdown.",
+    sacem_hide_no_revenue:"Hide albums with no revenue",
+    sacem_album_empty_filtered:"All tracked albums are hidden (none has SACEM revenue yet) — uncheck \"Hide albums with no revenue\" to see them.",
+    sacem_album_empty:"No album with both time AND revenue to calculate this yet.",
+    sacem_album_no_track_detail:"No track linked to this album yet.",
+    sacem_album_no_track_year:"No track earned anything this year for this album.",
+    sacem_album_year_total:"Total",
+    sacem_album_since:"Since",
+    sacem_album_edit_date_hint:"Fix the real date if needed",
+    sacem_album_global_title:"Overview", sacem_album_global_total:"Total SACEM",
+    sacem_album_global_time:"Cumulative Logic time", sacem_album_global_albums:"Albums tracked",
+    sacem_album_global_tracks:"Tracks tracked",
+    sacem_album_global_shows:"Distinct shows",
     sacem_roi_load_more:"Show 30 more",
+    sacem_roi_see_all:"See the full ranking",
+    sacem_tab_overview:"Overview", sacem_tab_profit:"Profitability", sacem_tab_data:"Data & imports",
     logic_banner_title:"Logic Pro project detected",
     logic_banner_add_btn:"Add current project",
     logic_modal_title:"Add Logic Pro project",
@@ -2108,6 +2281,21 @@ const TRANSLATIONS = {
     logic_not_linked:"Not linked to a Logic Pro project yet",
     logic_link_btn:"Link…",
     logic_link_conflict:"This Logic Pro project is already linked to another track: ",
+    logic_manual_time_title:"Set a time manually", logic_manual_time_link:"Manual time",
+    logic_manual_time_estimate_tag:"estimate",
+    logic_manual_time_modal_title:"Time spent on this track",
+    logic_manual_time_desc:"A rough estimate is fine — mainly useful for a track composed before automatic tracking existed.",
+    logic_manual_time_hours:"Hours", logic_manual_time_minutes:"Minutes",
+    logic_manual_time_saved:"Time saved",
+    logic_live_badge:"Currently open in Logic Pro",
+    logic_debug_check_btn:"Check", logic_debug_check_title:"Check the match with Logic Pro right now",
+    logic_debug_no_project:"No open project currently detected in Logic Pro (check that a project is actually open, and that SYNC.PLANNER's Accessibility permission is granted).",
+    logic_debug_match:"The link matches the project currently open in Logic Pro ✓", logic_debug_no_meta:"no metadata (BPM/key) read from this project",
+    logic_debug_mismatch:"The project currently open in Logic Pro doesn't match this track's link — that's why nothing is updating.",
+    logic_relink_autofix:"You picked the containing folder instead of the project — automatically corrected to the .logicx found inside.",
+    logic_relink_wrong_pick:"That's not a .logicx file — make sure to select the project's .logicx package, not the folder containing it (e.g. next to an exported .mp3).",
+    logic_manual_detect:"Refresh Logic Pro detection",
+    logic_manual_detect_none:"No open Logic Pro project currently detected.",
     logic_modal_link_existing:"Link to an existing track",
     logic_modal_link_suggestion:"(suggestion found)",
     logic_modal_link_placeholder:"Choose a track…",
@@ -2244,11 +2432,19 @@ const TRANSLATIONS = {
     nav_publishers:"Publishers",
     pub_title:"Publishers", pub_search:"Search a publisher…",
     pub_all_years:"All years",
+    proj_all_years:"All years",
     pub_count:"Publishers", pub_validated:"Validated tracks",
     pub_rate:"Average rate", pub_waiting:"Awaiting feedback",
     pub_no_publisher:"No publisher",
     pub_breakdown_month:"Tracks per month", pub_breakdown_year:"Tracks per year",
     pub_contact:"Publisher contact info", pub_add_info:"Add info", pub_no_contact:"No contact info yet",
+    pub_sacem_title:"SACEM revenue", pub_sacem_ai_btn:"Analyze with AI", pub_sacem_ai_loading:"Analyzing…",
+    pub_sacem_total:"Total net", pub_sacem_avg_per_track:"Avg. / track (with revenue)", pub_sacem_roi:"Avg. profitability",
+    pub_sacem_tracks_with_revenue:"tracks with revenue",
+    pub_sacem_caution:"The total depends on the number of tracks — compare the average per track between publishers instead.",
+    pub_sacem_total_tooltip:"Sum of net SACEM amounts collected on tracks placed with this publisher.",
+    pub_sacem_avg_tooltip:"Total net ÷ number of tracks that generated revenue (tracks at €0 are not counted).",
+    pub_sacem_roi_tooltip:"Annualized hourly profitability: average annual SACEM revenue ÷ time spent on Logic Pro (in hours)\nEx: €5.54/h/year = these tracks earn on average €5.54 per year, per hour spent on them.\nLets you compare without an older track's age skewing the result (an older track has had more time to accumulate royalties).",
     pc_contact:"Main contact", pc_phone:"Phone", pc_address:"Address", pc_logo:"Logo",
     pc_logo_upload_btn:"Upload a file…", pc_logo_too_big:"Image too large (max 1.5 MB)", pc_logo_read_fail:"Couldn't read this file",
     pc_logo_fetching:"Fetching image…", pc_logo_fetch_ok:"Image fetched", pc_logo_fetch_fail:"Couldn't fetch this image — try \"Upload a file…\" instead",
@@ -2275,6 +2471,8 @@ const TRANSLATIONS = {
     briefing_more:"more",
     briefing_album_relance:"album(s) with no publisher reply — urgent follow-up",
     briefing_track_relance:"track(s) with no reply — follow-up recommended",
+    briefing_tracks_waiting:"track with no reply",
+    briefing_tracks_waiting_plural:"tracks with no reply",
     briefing_days_no_reply:"d no reply",
     date_set:"Set date", date_popup_cancel:"Cancel", date_popup_confirm:"Confirm",
     relance_last:"Publisher follow-up", relance_reply_btn:"Reply received", relance_reset:"Reset",
@@ -2357,6 +2555,8 @@ const TRANSLATIONS = {
     relance_overdue:"Follow up! ({n}d no reply)",
     relance_ok:"✓ {n}d until follow-up",
     relance_hint:"Enter the last contact date",
+    relance_count_label:"Follow-up",
+    save_manual_toast:"Saved",
     // Stats new tabs
     stats_tab_year:"By Year", stats_tab_monthly:"Monthly",
     stats_tab_collabs:"Collabs", stats_tab_total:"Total",
@@ -2460,7 +2660,7 @@ const TRANSLATIONS = {
     ai_q5:"Sync Watch", ai_q6:"Trending Moods",
     ai_q7:"Risk Analysis", ai_q8:"Weekly Report",
     ai_q9:"What to do today?", ai_q10:"Blocked Tracks",
-    ai_q11:"My Memory", ai_q12:"Predict my deadline",
+    ai_q11:"My Memory", ai_q12:"Predict my deadline", ai_q13:"My most profitable tracks",
     year_label:"Year:", cal_month:"Month",
     goals_reached_short:"Goal reached!", goals_remaining:"more to go",
     goals_exceeded:"Goal exceeded!", goals_details:"Details",
@@ -2521,6 +2721,23 @@ const TRANSLATIONS = {
       "Deadline mode: ON. Double espresso. ☕☕",
       "It's now or never. You know what to do. 💪",
       "Come on, drop everything and deliver! 🚀",
+    ],
+    briefing_quotes:[
+      "\"Music gives a soul to the universe, wings to the mind, flight to the imagination.\" — Plato",
+      "\"Without music, life would be a mistake.\" — Friedrich Nietzsche",
+      "\"Music expresses that which cannot be put into words and that which cannot remain silent.\" — Victor Hugo",
+      "\"Music produces a kind of pleasure which human nature cannot do without.\" — Confucius",
+      "\"Music is a higher revelation than all wisdom and philosophy.\" — Beethoven",
+      "\"Compose like no one's listening, mix like everyone is.\" — Anonymous",
+      "\"Silence is a note too — learn to write it.\" — Anonymous",
+      "\"Every rejected track brings you closer to the one that gets accepted.\" — Anonymous",
+      "\"A good theme hums itself; a good mix is felt.\" — Anonymous",
+      "\"Patience is the hidden tempo of every sync career.\" — Anonymous",
+      "\"You never compose alone — tomorrow's publisher is already listening.\" — Anonymous",
+      "\"A composer without a deadline is a composer still dreaming.\" — Anonymous",
+      "\"The best take is usually the third — never the first, never the tenth.\" — Anonymous",
+      "\"A well-organized sample library beats all the talent in the world.\" — Anonymous",
+      "\"Sync is 10% inspiration and 90% follow-up emails.\" — Anonymous",
     ],
   }
 };
@@ -2764,12 +2981,18 @@ function updateUI() {
     "ui-ai-q10":              t("ai_q10"),
     "ui-ai-q11":              t("ai_q11"),
     "ui-ai-q12":              t("ai_q12"),
+    "ui-ai-q13":              t("ai_q13"),
     "ui-pub-all-years":       t("pub_all_years"),
+    "ui-proj-all-years":      t("proj_all_years"),
     "ui-pc-contact":          t("pc_contact"),
     "ui-pc-phone":            t("pc_phone"),
     "ui-pc-address":          t("pc_address"),
     "ui-pc-logo":             t("pc_logo"),
     "ui-pc-logo-upload":      t("pc_logo_upload_btn"),
+    "ui-logic-manual-detect": t("logic_manual_detect"),
+    "ui-sacem-tab-overview": t("sacem_tab_overview"),
+    "ui-sacem-tab-profit": t("sacem_tab_profit"),
+    "ui-sacem-tab-data": t("sacem_tab_data"),
     "ui-pc-email":            t("pc_email"),
     "ui-pc-email2":           t("pc_email2"),
     "ui-pc-submit-link":      t("pc_submit_link"),
@@ -2802,6 +3025,9 @@ function updateUI() {
     "ui-sacem-title":          t("sacem_title"),
     "ui-sacem-beta-notice":    t("sacem_beta_notice"),
     "ui-sacem-import-btn":     t("sacem_import_btn"),
+    "ui-sacem-evolution-title": t("sacem_evolution_title"),
+    "ui-sacem-evolution-desc":  t("sacem_evolution_desc"),
+    "ui-sacem-evolution-lag-notice": t("sacem_evolution_lag_notice"),
     "ui-sacem-summary-title":  t("sacem_summary_title"),
     "ui-sacem-imports-title":  t("sacem_imports_title"),
     "ui-sacem-review-title":   t("sacem_review_title"),
@@ -2812,6 +3038,13 @@ function updateUI() {
     "ui-sacem-duplicates-desc":  t("sacem_duplicates_desc"),
     "ui-sacem-roi-title":        t("sacem_roi_title"),
     "ui-sacem-roi-desc":         t("sacem_roi_desc"),
+    "ui-sacem-mood-title":       t("sacem_mood_title"),
+    "ui-sacem-mood-desc":        t("sacem_mood_desc"),
+    "ui-sacem-editeur-title":    t("sacem_editeur_roi_title"),
+    "ui-sacem-editeur-desc":     t("sacem_editeur_roi_desc"),
+    "ui-sacem-album-title":      t("sacem_album_title"),
+    "ui-sacem-album-desc":       t("sacem_album_desc"),
+    "ui-sacem-hide-no-revenue":  t("sacem_hide_no_revenue"),
     "ui-tab-logictime":          t("stats_tab_logictime"),
   };
   for(const [id, val] of Object.entries(els)) {
@@ -2943,6 +3176,7 @@ const ICON_CLIPBOARD = '<svg width="12" height="12" viewBox="0 0 24 24" fill="no
 const ICON_ROCKET_48 = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 9.5 16.5 14 18 21.5 12 17.8 6 21.5 7.5 14 2 9.5 9 9"/></svg>';
 const ICON_ALARM_48 = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 15"/><path d="M5 3 2 6M22 6l-3-3M6 19l-1.5 1.5M18 19l1.5 1.5"/></svg>';
 const ICON_STAR = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="12 2 15 9 22 9.5 16.5 14 18 21.5 12 17.8 6 21.5 7.5 14 2 9.5 9 9"/></svg>';
+const ICON_EDIT_SM = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
 
 const LICENCE = {
   get() { try { return JSON.parse(localStorage.getItem("syncplanner_licence")||"{}"); } catch(e){return {};} },
@@ -3254,6 +3488,16 @@ document.addEventListener("keydown", e => {
     if(inInput) return;
     e.preventDefault(); redo();
   }
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s") {
+    // Sauvegarde manuelle immédiate (l'appli sauvegarde déjà automatiquement,
+    // mais Cmd+S force l'écriture tout de suite plutôt que d'attendre le debounce).
+    e.preventDefault();
+    flushSaveNow();
+    const dot = document.getElementById("save-dot"), label = document.getElementById("save-label");
+    if(dot) dot.className = "save-dot ok";
+    if(label) label.textContent = t("saved");
+    showUndoToast(ICON_CHECK + (t("save_manual_toast")||"Sauvegardé"), true);
+  }
 });
 
 function saveToStorage() {
@@ -3292,6 +3536,24 @@ function save() {
   pushHistory();
   saveToStorage();
 }
+
+// Sauvegarde silencieuse : écrit dans localStorage sans pousser d'entrée dans
+// l'historique Cmd+Z. Réservée aux synchronisations automatiques (tick Logic
+// Pro toutes les 30s, métadonnées BPM/clé rafraîchies en tâche de fond) —
+// sinon quelques minutes de composition suffisent à remplir les 20
+// emplacements d'historique et à effacer les vraies actions de l'utilisateur.
+function saveSilent() {
+  saveToStorage();
+}
+
+// Écrit immédiatement dans localStorage, sans attendre le debounce de 600ms.
+// Appelé juste avant la fermeture de la fenêtre pour ne jamais perdre les
+// toutes dernières modifications si l'appli est fermée juste après une saisie.
+function flushSaveNow() {
+  clearTimeout(saveTimer);
+  try { localStorage.setItem("syncplanner_v3", JSON.stringify(S)); } catch(e) {}
+}
+window.addEventListener("beforeunload", flushSaveNow);
 
 // ── Date input robuste : 3 selects Jour/Mois/Année (contourne le bug du picker natif Electron) ──
 function buildDateSelect(id, value, onChangeCall) {
@@ -3387,6 +3649,35 @@ function showPage(p) {
 // ══════════════════════════════════════════════════════════
 function daysUntil(d) { return Math.ceil((new Date(d)-new Date())/86400000); }
 function fmtDate(d) { if(!d)return "—"; const x=new Date(d); if(isNaN(x.getTime()))return "—"; return `${x.getDate()} ${MONTHS_SHORT[x.getMonth()]} ${x.getFullYear()}`; }
+function fmtDateTime(d) { if(!d)return "—"; const x=new Date(d); if(isNaN(x.getTime()))return "—"; const h=String(x.getHours()).padStart(2,"0"), m=String(x.getMinutes()).padStart(2,"0"); return `${x.getDate()} ${MONTHS_SHORT[x.getMonth()]} ${x.getFullYear()} — ${h}:${m}`; }
+// Un album est "à relancer" si au moins une de ses tracks (pas l'album lui-même)
+// attend une réponse depuis trop longtemps — source unique de vérité pour les
+// alertes de relance, au lieu d'un chronomètre "contact album" indépendant qui
+// pouvait raconter une histoire différente de celle des tracks.
+function albumHasOverdueTrack(p) {
+  if(!p || p.archived || ['accepted','validated','delivered'].includes(p.status)) return false;
+  const waitingStatuses = ['sent','revision','mix','mixsent'];
+  return (p.tracks||[]).some(trk => {
+    const hasReply = trk.relanceReply || ['validated','delivered','refused'].includes(trk.status);
+    if(hasReply || !waitingStatuses.includes(trk.status)) return false;
+    const refDate = trk.delivered || trk.lastRelance;
+    if(!refDate) return false;
+    const days = Math.floor((new Date() - new Date(refDate)) / 86400000);
+    return days >= (trk.relanceDelay || 15);
+  });
+}
+// Liste "Relance 1", "Relance 2"... affichée sous le bloc de relance (album ou track)
+function relanceHistoryHtml(history) {
+  if(!history || !history.length) return "";
+  const rows = history.map((iso, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7B78A8;padding:3px 0">
+      <span style="color:#A78BFA;font-weight:700">${(t("relance_count_label")||"Relance")} ${i+1}</span>
+      <span>—</span>
+      <span>${fmtDateTime(iso)}</span>
+    </div>`
+  ).join("");
+  return `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #2A2750">${rows}</div>`;
+}
 // Safe getElementById that handles decimal IDs (legacy data)
 function getProjCard(pid) {
   // Direct lookup first
@@ -3396,6 +3687,35 @@ function getProjCard(pid) {
   return [...document.querySelectorAll('[id^="proj-"]')].find(el=>el.id==="proj-"+String(pid))||null;
 }
 function newId() { return Date.now() * 1000 + Math.floor(Math.random() * 1000); }
+// Les id sont générés via newId() = Date.now()*1000 + aléa — on peut donc en
+// retrouver la date de création approximative sans champ dédié. Mais ça ne
+// vaut que pour un album créé dans l'appli au moment où il a réellement
+// démarré : un ancien album (composé en 2024, par exemple) rajouté dans
+// SyncPlanner seulement en 2026 aurait un id de 2026, donc une date fausse.
+// sacemDateOverride permet de corriger ça manuellement, album par album.
+function idToDate(id) { return new Date(Math.floor(id / 1000)); }
+function albumSinceValue(albumId) {
+  const p = (S.projects||[]).find(x => x.id === albumId);
+  if (p && p.sacemDateOverride) return p.sacemDateOverride;
+  // Chaque track a son propre champ "created" (date réelle de composition,
+  // déjà modifiable à la main sur la page Projets) — bien plus fiable que
+  // l'id de l'album, qui ne reflète que le moment où l'album a été ajouté
+  // dans SyncPlanner. On prend la plus ancienne date de track de l'album.
+  const trackDates = (p && p.tracks || []).map(t => t.created).filter(Boolean).sort();
+  if (trackDates.length) return trackDates[0].slice(0, 7);
+  return idToDate(albumId).toISOString().slice(0, 7);
+}
+function albumSinceLabel(albumId) {
+  const val = albumSinceValue(albumId);
+  const d = new Date(val + "-02"); // jour neutre pour éviter tout souci de fuseau horaire
+  return d.toLocaleDateString(undefined, {month:"long", year:"numeric"});
+}
+function saveAlbumSinceDate(albumId, value, ev) {
+  if (ev) ev.stopPropagation();
+  const p = (S.projects||[]).find(x => x.id === albumId);
+  if (p && value) { p.sacemDateOverride = value; save(); }
+  renderSacemPage();
+}
 function allTracks() { return S.projects.flatMap(p=>p.tracks.map(t=>({...t,projectId:p.id,projectTitle:p.title,editeur:p.editeur}))); }
 function el(tag,cls,html) { const e=document.createElement(tag); if(cls)e.className=cls; if(html)e.innerHTML=html; return e; }
 function deadlineColor(d) { const days=daysUntil(d); if(days<0)return "#F87171"; if(days<=7)return "#F87171"; if(days<=15)return "#FB923C"; if(days<=30)return "#FBBF24"; return "#10B981"; }
@@ -3458,6 +3778,14 @@ function importJSON(inp) {
 // ══════════════════════════════════════════════════════════
 // SEARCH
 // ══════════════════════════════════════════════════════════
+// Avec ~250+ tracks, un scan complet du catalogue + reconstruction du DOM
+// à CHAQUE frappe clavier peut se sentir mou. On laisse handleSearch() tel
+// quel mais on ne l'appelle plus qu'après une courte pause de frappe.
+let searchDebounceTimer = null;
+function debouncedHandleSearch(q) {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => handleSearch(q), 150);
+}
 function handleSearch(q) {
   const box=document.getElementById("search-results");
   if(!q.trim()){box.style.display="none";return;}
@@ -3522,18 +3850,9 @@ function getAlerts() {
       }
     }
 
-    // Relance album — basé sur lastContact, toujours affiché si délai dépassé
-    if(p.lastContact) {
-      const daysSince = Math.floor((new Date()-new Date(p.lastContact))/86400000);
-      const delay = p.relanceDelay||15;
-      const allDone = p.tracks.length>0 && p.tracks.every(t=>doneStatuses.includes(t.status));
-      if(daysSince >= delay && !allDone)
-        alerts.push({
-          icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
-          text:`"${p.title}" (${p.editeur}||"éditeur"}) — ${daysSince}j sans réponse`,
-          days:daysSince, proj:p.title, type:"relance", pid:p.id
-        });
-    }
+    // Note : plus d'alerte "relance album" séparée ici — chaque track en
+    // attente déclenche déjà sa propre alerte ci-dessous, ce qui évite un
+    // double compteur "en retard" racontant deux histoires différentes.
 
     // Relances tracks — toujours affichées si délai dépassé
     p.tracks.forEach(trk=>{
@@ -3547,7 +3866,7 @@ function getAlerts() {
       if(daysSince >= delay && waitingStatuses.includes(trk.status))
         alerts.push({
           icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
-          text:`"${trk.title}||"Track"}" — ${p.title} · ${daysSince}j sans réponse`,
+          text:`"${trk.title||"Track"}" — ${p.title} · ${daysSince}j sans réponse`,
           days:daysSince, proj:p.title, type:"relance", pid:p.id, tid:trk.id
         });
     });
@@ -3686,6 +4005,34 @@ function renderAlertBanner() {
 // ══════════════════════════════════════════════════════════
 let pendingLogicProject = null;
 
+// Track actuellement ouverte dans Logic Pro (clé "projectId-trackId"), pour
+// affichage d'une mise en surbrillance dans les listes de tracks. Mise à
+// jour à chaque 'logic-project-update' — n'influence jamais le suivi de
+// temps automatique (handleLogicTimeTick), purement visuel.
+let liveLogicTrackKey = null;
+
+function isLiveLogicTrack(pid, tid) {
+  return liveLogicTrackKey === `${pid}-${tid}`;
+}
+
+function updateLiveLogicIndicator(data) {
+  const prevKey = liveLogicTrackKey;
+  if (!data || !data.projectPath) {
+    liveLogicTrackKey = null;
+  } else {
+    const found = findTrackByLogicPath(data.projectPath);
+    liveLogicTrackKey = found ? `${found.project.id}-${found.track.id}` : null;
+  }
+  if (liveLogicTrackKey !== prevKey) refreshLiveLogicViews();
+}
+
+function refreshLiveLogicViews() {
+  if (currentPage === "dashboard") renderDashboard();
+  else if (currentPage === "projects") renderProjects();
+  else if (currentPage === "kanban") renderKanban();
+  else if (currentPage === "publishers") renderPublishers();
+}
+
 (function initLogicSync() {
   if (!window.require) return; // hors Electron, on ignore
   try {
@@ -3696,12 +4043,23 @@ let pendingLogicProject = null;
     ipcRenderer.on('logic-time-tick', function(event, data) {
       handleLogicTimeTick(data);
     });
+    // Au lancement / après un ⌘R, Logic peut déjà être ouvert sur un projet
+    // depuis avant — dans ce cas aucun 'logic-project-update' ne sera émis
+    // (rien n'a changé côté main process), donc la surbrillance resterait
+    // vide tant que le projet ouvert ne change pas. On interroge donc l'état
+    // actuel une fois au démarrage pour l'initialiser tout de suite — sans
+    // passer par handleLogicProjectUpdate, pour ne jamais déclencher le
+    // bandeau/modal de liaison automatique à l'ouverture de l'appli.
+    ipcRenderer.invoke('get-logic-project').then(function(data) {
+      updateLiveLogicIndicator(data);
+    }).catch(function() {});
   } catch (e) {
     // API non disponible, on ignore silencieusement
   }
 })();
 
 function handleLogicProjectUpdate(data) {
+  updateLiveLogicIndicator(data);
   if (!data || !data.projectPath) return;
 
   // Projet déjà lié à une track existante (même après fermeture/réouverture
@@ -3736,7 +4094,7 @@ function updateLinkedLogicTrack(existing, data) {
   existing.track.bpm = data.bpm != null ? String(data.bpm) : existing.track.bpm;
   existing.track.key = data.key || existing.track.key;
   existing.track.timeSignature = data.timeSignature || existing.track.timeSignature;
-  save();
+  saveSilent(); // sync auto en tâche de fond — ne doit pas polluer l'historique Cmd+Z
   if (currentPage === "dashboard") renderDashboard(); else renderProjects();
 }
 
@@ -3754,8 +4112,32 @@ function isLogicLinkBroken(track) {
 async function relinkLogicTrack(pid, tid) {
   if (!window.require) return;
   const { ipcRenderer } = window.require('electron');
-  const newPath = await ipcRenderer.invoke('pick-logicx-file');
+  let newPath = await ipcRenderer.invoke('pick-logicx-file');
   if (!newPath) return;
+
+  // Piège fréquent : sélectionner le dossier qui CONTIENT le projet (par
+  // exemple à côté d'un export .mp3) plutôt que le paquet .logicx lui-même.
+  // Le chemin "existe" donc rien ne plante, mais ni les métadonnées ni le
+  // temps automatique ne fonctionneront jamais — silencieusement, puisque
+  // Logic Pro reportera toujours le chemin du vrai .logicx, jamais celui du
+  // dossier parent. On corrige tout seul si un seul .logicx s'y trouve.
+  if (!/\.logicx$/i.test(newPath)) {
+    try {
+      const fs = window.require('fs');
+      const path = window.require('path');
+      const logicxChildren = fs.readdirSync(newPath).filter(function(name) { return /\.logicx$/i.test(name); });
+      if (logicxChildren.length === 1) {
+        newPath = path.join(newPath, logicxChildren[0]);
+        showUndoToast(t("logic_relink_autofix") || "Dossier sélectionné au lieu du projet — correction automatique vers le .logicx trouvé à l'intérieur.");
+      } else {
+        showUndoToast(ICON_WARN_SM + (t("logic_relink_wrong_pick") || "Ce n'est pas un fichier .logicx — sélectionne bien le paquet .logicx du projet, pas le dossier qui le contient (à côté d'un export .mp3 par exemple)."), true);
+        return;
+      }
+    } catch (e) {
+      showUndoToast(ICON_WARN_SM + (t("logic_relink_wrong_pick") || "Ce n'est pas un fichier .logicx — sélectionne bien le paquet .logicx du projet, pas le dossier qui le contient."), true);
+      return;
+    }
+  }
 
   const meta = await ipcRenderer.invoke('get-logic-project-for-path', newPath);
   if (!meta) {
@@ -3784,16 +4166,75 @@ async function relinkLogicTrack(pid, tid) {
   trk.timeSignature = meta.timeSignature || trk.timeSignature;
   save();
   showUndoToast(t("logic_relink_success") || "Projet Logic Pro relié");
-  // Le bouton "Lier…"/"Relier…" existe à la fois dans la modal Kanban et
-  // dans la vue Projets/Albums (fiche track dépliée) — on ne rafraîchit que
-  // la vue réellement à l'écran, sinon on rouvrirait la modal Kanban par
-  // erreur depuis la page Projets.
+  refreshLogicStatusView(p, trk);
+}
+
+// Rafraîchit uniquement la vue réellement à l'écran après une action liée au
+// statut Logic Pro d'une track (lien, relink, temps manuel) — le même bandeau
+// existe à la fois dans la modal Kanban et dans la fiche track dépliée de la
+// page Projets, on ne veut pas rouvrir l'un depuis l'autre par erreur.
+function refreshLogicStatusView(p, trk) {
   if (document.getElementById('kb-modal-overlay')) {
     _renderKanbanModal(p, trk);
   } else if (currentPage === "dashboard") {
     renderDashboard();
   } else {
     renderProjects();
+  }
+}
+
+// Diagnostic — compare en direct le projet actuellement ouvert dans Logic
+// Pro (même appel IPC que le polling automatique) au chemin lié sur cette
+// track, pour comprendre en un clic pourquoi le temps/les métadonnées ne
+// se mettent pas à jour (permission Accessibilité manquante, aucun projet
+// ouvert, ou lien pointant vers un autre projet que celui actuellement
+// ouvert). Ne modifie jamais rien.
+async function debugCheckLogicLink(pid, tid) {
+  if (!window.require) return;
+  const { ipcRenderer } = window.require('electron');
+  const p = S.projects.find(function(x) { return String(x.id) === String(pid); });
+  if (!p) return;
+  const trk = p.tracks.find(function(x) { return String(x.id) === String(tid); });
+  if (!trk) return;
+  try {
+    const current = await ipcRenderer.invoke('get-logic-project');
+    if (!current || !current.projectPath) {
+      showUndoToast(ICON_WARN_SM + (t("logic_debug_no_project") || "Logic Pro n'a pas de projet ouvert détecté actuellement (vérifie qu'un projet est bien ouvert, et la permission Accessibilité de SYNC.PLANNER)."), true);
+      return;
+    }
+    if (current.projectPath === trk.logicProjectPath) {
+      const bits = [];
+      if (current.bpm) bits.push(current.bpm + " BPM");
+      if (current.key) bits.push(current.key);
+      showUndoToast((t("logic_debug_match") || "Le lien correspond bien au projet ouvert dans Logic Pro ✓") + (bits.length ? " — " + bits.join(" · ") : " — " + (t("logic_debug_no_meta") || "aucune métadonnée (BPM/clé) lue dans ce projet")));
+    } else {
+      showUndoToast(ICON_WARN_SM + (t("logic_debug_mismatch") || "Le projet actuellement ouvert dans Logic Pro ne correspond pas au lien de cette track — c'est pour ça que rien ne se met à jour.") + '<br><span style="font-size:10px;color:#4B4870">' + escapeHtml(current.projectPath) + '</span>', true);
+    }
+  } catch (e) {
+    showUndoToast(ICON_CROSS + escapeHtml(e.message), true);
+  }
+}
+
+// Détection Logic Pro à la demande. Normalement la détection est passive :
+// le process principal ne pousse un événement que quand le projet ouvert
+// dans Logic CHANGE par rapport au dernier poll — donc si un projet était
+// déjà ouvert et inchangé au moment où sa track a été supprimée (pour être
+// relinkée proprement, par exemple), aucun nouvel événement n'arrive et le
+// bandeau "Projet Logic Pro détecté" ne réapparaît jamais tout seul. Ce
+// bouton relance manuellement le même traitement (handleLogicProjectUpdate)
+// avec l'état actuel de Logic Pro, sans attendre un changement.
+async function manualDetectLogicProject() {
+  if (!window.require) return;
+  const { ipcRenderer } = window.require('electron');
+  try {
+    const data = await ipcRenderer.invoke('get-logic-project');
+    if (!data || !data.projectPath) {
+      showUndoToast(ICON_WARN_SM + (t("logic_manual_detect_none") || "Aucun projet Logic Pro ouvert actuellement détecté."), true);
+      return;
+    }
+    handleLogicProjectUpdate(data);
+  } catch (e) {
+    showUndoToast(ICON_CROSS + escapeHtml(e.message), true);
   }
 }
 
@@ -3810,33 +4251,130 @@ function findTrackByLogicPath(projectPath) {
 // lien cassé (renommé/déplacé) > sync désactivée (album terminé/archivé) >
 // temps de travail cumulé > pas encore liée (bouton pour lier).
 function buildLogicStatusHtml(p, trk) {
+  // Petit lien discret pour saisir/corriger un temps à la main — utile
+  // surtout pour les tracks anciennes, composées avant que le suivi
+  // automatique n'existe, pour avoir quand même une estimation plausible
+  // dans le calcul de rentabilité. N'écrase jamais le suivi automatique en
+  // continu : ça pose juste une valeur de départ, les ticks Logic Pro
+  // s'additionnent normalement par-dessus ensuite (voir handleLogicTimeTick).
+  const manualEditBtn = '<button class="btn btn-sm" style="background:transparent;border:none;color:#5B5880;padding:2px 4px;font-size:10px" onclick="openManualLogicTimeModal(' + p.id + ',' + trk.id + ')" title="' + (t("logic_manual_time_title") || "Renseigner un temps manuellement") + '">' + ICON_EDIT_SM + (t("logic_manual_time_link") || "Temps manuel") + '</button>';
+
   if (trk.logicProjectPath && typeof isLogicLinkBroken === 'function' && isLogicLinkBroken(trk)) {
-    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#FB923C">' +
+    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#FB923C;flex-wrap:wrap">' +
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
       (t("logic_link_broken") || "Lien Logic Pro cassé (projet renommé/déplacé)") +
-      ' <button class="btn btn-sm" style="margin-left:auto" onclick="relinkLogicTrack(' + p.id + ',' + trk.id + ')">' + (t("logic_relink_btn") || "Relier…") + '</button>' +
+      ' <span style="margin-left:auto;display:flex;gap:4px;align-items:center">' + manualEditBtn + '<button class="btn btn-sm" onclick="relinkLogicTrack(' + p.id + ',' + trk.id + ')">' + (t("logic_relink_btn") || "Relier…") + '</button></span>' +
       '</div>';
   } else if (trk.logicProjectPath && typeof isLogicSyncDisabledForProject === 'function' && isLogicSyncDisabledForProject(p)) {
-    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#5B5880">' +
+    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#5B5880;flex-wrap:wrap">' +
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5B5880" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>' +
       (t("logic_sync_disabled") || "Sync Logic Pro désactivée (album terminé/archivé)") +
+      (trk.logicTimeSpent ? ' — Temps Logic Pro : <strong style="color:#C4C0E8">' + formatLogicDuration(trk.logicTimeSpent) + '</strong>' + (trk.logicTimeIsEstimate ? ' <span style="color:#7B78A8;font-style:italic">(' + (t("logic_manual_time_estimate_tag") || "estimation") + ')</span>' : '') : '') +
+      ' <span style="margin-left:auto">' + manualEditBtn + '</span>' +
       '</div>';
   } else if (trk.logicTimeSpent) {
-    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#5B5880">' +
+    // Toujours proposer un bouton pour (re)lier la track : si elle n'est pas
+    // encore liée, "Lier…" ; si elle l'est déjà (même correctement, fichier
+    // valide), "Relier…" pour permettre de corriger une erreur de liaison —
+    // sinon on serait bloqué dès qu'un temps existe et que le lien "marche"
+    // techniquement, même s'il pointe vers le mauvais projet Logic Pro.
+    // relinkLogicTrack() ne touche jamais logicTimeSpent, donc le temps déjà
+    // cumulé (auto ou manuel) est toujours conservé après correction.
+    const linkOrChangeBtn = '<button class="btn btn-sm" onclick="relinkLogicTrack(' + p.id + ',' + trk.id + ')">' +
+      (trk.logicProjectPath ? (t("logic_relink_btn") || "Relier…") : (t("logic_link_btn") || "Lier…")) + '</button>';
+    // Bouton de diagnostic — utile pour comprendre pourquoi le temps/les
+    // métadonnées ne se mettent pas à jour : compare en direct le projet
+    // actuellement ouvert dans Logic Pro (via l'IPC déjà utilisé pour le
+    // polling) au chemin lié sur cette track, sans rien modifier.
+    const checkBtn = trk.logicProjectPath
+      ? '<button class="btn btn-sm" style="background:transparent;border:none;color:#5B5880;padding:2px 4px;font-size:10px" onclick="debugCheckLogicLink(' + p.id + ',' + trk.id + ')" title="' + (t("logic_debug_check_title") || "Vérifier la correspondance avec Logic Pro maintenant") + '">' + (t("logic_debug_check_btn") || "Vérifier") + '</button>'
+      : '';
+    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#5B5880;flex-wrap:wrap">' +
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
       'Temps Logic Pro : <strong style="color:#C4C0E8">' + formatLogicDuration(trk.logicTimeSpent) + '</strong>' +
+      (trk.logicTimeIsEstimate ? ' <span style="color:#7B78A8;font-style:italic">(' + (t("logic_manual_time_estimate_tag") || "estimation") + ')</span>' : '') +
+      ' <span style="margin-left:auto;display:flex;gap:4px;align-items:center">' + manualEditBtn + checkBtn + linkOrChangeBtn + '</span>' +
       '</div>';
   } else if (!trk.logicProjectPath) {
     // Track créée manuellement dans SyncPlanner, jamais liée à un projet
     // Logic Pro sur le disque : pas de bandeau d'alerte (rien n'est cassé),
-    // juste une invitation discrète à lier pour démarrer le suivi du temps.
-    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#5B5880">' +
+    // juste une invitation discrète à lier pour démarrer le suivi du temps
+    // (ou, pour une track ancienne, à renseigner une estimation à la main).
+    return '<div style="padding:8px 20px;border-bottom:1px solid #1E1C38;display:flex;align-items:center;gap:6px;font-size:11px;color:#5B5880;flex-wrap:wrap">' +
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5B5880" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
       (t("logic_not_linked") || "Pas encore liée à un projet Logic Pro") +
-      ' <button class="btn btn-sm" style="margin-left:auto" onclick="relinkLogicTrack(' + p.id + ',' + trk.id + ')">' + (t("logic_link_btn") || "Lier…") + '</button>' +
+      ' <span style="margin-left:auto;display:flex;gap:4px;align-items:center">' + manualEditBtn +
+      '<button class="btn btn-sm" onclick="relinkLogicTrack(' + p.id + ',' + trk.id + ')">' + (t("logic_link_btn") || "Lier…") + '</button></span>' +
       '</div>';
   }
   return '';
+}
+
+// Modal de saisie manuelle du temps Logic Pro — surtout utile pour les
+// tracks composées avant que le suivi automatique n'existe : ça permet de
+// poser une estimation plausible (en heures/minutes) pour qu'elles
+// apparaissent quand même dans le calcul de rentabilité €/h/an. N'affecte
+// jamais le suivi automatique en cours : c'est juste une valeur de départ
+// sur laquelle les ticks Logic Pro (handleLogicTimeTick) continuent de
+// s'additionner normalement ensuite si la track est/devient liée.
+function openManualLogicTimeModal(pid, tid) {
+  const p = S.projects.find(function(x) { return String(x.id) === String(pid); });
+  if (!p) return;
+  const trk = p.tracks.find(function(x) { return String(x.id) === String(tid); });
+  if (!trk) return;
+
+  const existingOverlay = document.getElementById('manual-logic-time-overlay');
+  if (existingOverlay) existingOverlay.remove();
+
+  const currentSeconds = trk.logicTimeSpent || 0;
+  const curHours = Math.floor(currentSeconds / 3600);
+  const curMinutes = Math.round((currentSeconds % 3600) / 60);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'manual-logic-time-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.dataset.pid = pid;
+  overlay.dataset.tid = tid;
+
+  overlay.innerHTML =
+    '<div style="background:#13122A;border:1px solid #2A2750;border-radius:14px;max-width:340px;width:100%;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,0.6)">' +
+      '<div style="font-size:15px;font-weight:800;color:#F0EEF8;margin-bottom:4px">' + (t("logic_manual_time_modal_title") || "Temps passé sur cette track") + '</div>' +
+      '<div style="font-size:12px;color:#7B78A8;margin-bottom:16px">' + escapeHtml(trk.title || "") + '</div>' +
+      '<div style="font-size:11px;color:#5B5880;margin-bottom:14px">' + (t("logic_manual_time_desc") || "Une estimation approximative suffit — surtout utile pour une track composée avant l'existence du suivi automatique.") + '</div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:16px">' +
+        '<div style="flex:1"><label class="lbl">' + (t("logic_manual_time_hours") || "Heures") + '</label><input type="number" min="0" class="inp" id="manual-logic-time-hours" value="' + curHours + '"></div>' +
+        '<div style="flex:1"><label class="lbl">' + (t("logic_manual_time_minutes") || "Minutes") + '</label><input type="number" min="0" max="59" class="inp" id="manual-logic-time-minutes" value="' + curMinutes + '"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button class="btn btn-sm" onclick="document.getElementById(\'manual-logic-time-overlay\').remove()">' + (t("logic_modal_cancel") || "Annuler") + '</button>' +
+        '<button class="btn btn-sm btn-primary" onclick="confirmManualLogicTime()">' + (t("logic_modal_confirm") || "Confirmer") + '</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+}
+
+function confirmManualLogicTime() {
+  const overlay = document.getElementById('manual-logic-time-overlay');
+  if (!overlay) return;
+  const pid = overlay.dataset.pid;
+  const tid = overlay.dataset.tid;
+  const p = S.projects.find(function(x) { return String(x.id) === String(pid); });
+  if (!p) return;
+  const trk = p.tracks.find(function(x) { return String(x.id) === String(tid); });
+  if (!trk) return;
+
+  const hours = Math.max(0, parseFloat(document.getElementById('manual-logic-time-hours').value) || 0);
+  const minutes = Math.max(0, parseFloat(document.getElementById('manual-logic-time-minutes').value) || 0);
+  trk.logicTimeSpent = Math.round(hours * 3600 + minutes * 60);
+  // Marqué comme estimation tant qu'aucun vrai tick Logic Pro ne vient s'y
+  // ajouter (handleLogicTimeTick retire ce flag dès le premier tick réel).
+  trk.logicTimeIsEstimate = true;
+  save();
+  overlay.remove();
+  showUndoToast(t("logic_manual_time_saved") || "Temps enregistré");
+  refreshLogicStatusView(p, trk);
 }
 
 // Formate un nombre de secondes en "Xh YYmin" (ou "YYmin" si < 1h)
@@ -3946,7 +4484,11 @@ function handleLogicTimeTick(data) {
   if (!existing) return; // pas de track liée à ce projet → rien à incrémenter
   if (isLogicSyncDisabledForProject(existing.project)) return; // album terminé/archivé
   existing.track.logicTimeSpent = (existing.track.logicTimeSpent || 0) + (data.seconds || 0);
-  save();
+  // Dès qu'un vrai tick Logic Pro arrive, le temps n'est plus une pure
+  // estimation manuelle — même s'il en reste une base, il est désormais
+  // mesuré en continu comme n'importe quelle autre track suivie.
+  if (existing.track.logicTimeIsEstimate) existing.track.logicTimeIsEstimate = false;
+  saveSilent(); // tick auto (30s) — ne doit pas polluer l'historique Cmd+Z
   // Pas de re-render forcé à chaque tick (30s) pour éviter de perturber une
   // saisie en cours ; la modal Kanban se rafraîchit déjà à chaque interaction.
 }
@@ -4198,6 +4740,23 @@ function confirmLogicAddModal() {
 let sacemReviewLimit = 150;
 let sacemMatchedLimit = 150;
 let sacemRoiLimit = 30;
+let sacemExpandedAlbumId = null;
+let sacemAlbumDetailYear = "all";
+
+function setSacemAlbumDetailYear(year) {
+  sacemAlbumDetailYear = year;
+  renderSacemPage();
+}
+// Coupé pour l'instant à la demande du compositeur (échantillon par mood
+// trop faible pour être vraiment utile) — code conservé pour une reprise
+// ultérieure, juste masqué de l'UI.
+const SACEM_MOOD_CARD_ENABLED = false;
+
+function toggleSacemAlbumDetail(albumId) {
+  sacemExpandedAlbumId = (sacemExpandedAlbumId === albumId) ? null : albumId;
+  sacemAlbumDetailYear = "all";
+  renderSacemPage();
+}
 let sacemReviewSelected = new Set();
 // Répartitions (imports) désélectionnées pour le total/les tableaux affichés.
 // Vide par défaut = tous les relevés comptent (comportement historique).
@@ -4215,6 +4774,34 @@ function setAllSacemImportsFilter(included) {
   if (included) sacemExcludedImportIds.clear();
   else imports.forEach(imp => sacemExcludedImportIds.add(imp.id));
   renderSacemPage();
+}
+
+// Essaie d'isoler un trimestre à partir de la colonne "Période
+// d'exploitation" — dont le format exact varie selon le relevé (année
+// seule, "T1 2024", "2024-Q1", une date ou une plage de dates...). Retourne
+// {year, quarter} avec quarter=null si le format ne permet pas de l'isoler
+// (dans ce cas l'appelant regroupe par année entière plutôt que par
+// trimestre pour cette ligne).
+function parseSacemPeriodeQuarter(periode) {
+  if (!periode) return { year: null, quarter: null };
+  const yearMatch = /(\d{4})/.exec(periode);
+  const year = yearMatch ? yearMatch[1] : null;
+  if (!year) return { year: null, quarter: null };
+
+  const tMatch = /\b(?:T|Q|Trimestre\s*)0?([1-4])\b/i.exec(periode);
+  if (tMatch) return { year, quarter: parseInt(tMatch[1]) };
+
+  const dateMatch = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-]\d{2,4}\b/.exec(periode);
+  if (dateMatch) {
+    const month = parseInt(dateMatch[2]);
+    if (month >= 1 && month <= 12) return { year, quarter: Math.ceil(month / 3) };
+  }
+  const isoDateMatch = /\b\d{4}-(\d{1,2})-\d{1,2}\b/.exec(periode);
+  if (isoDateMatch) {
+    const month = parseInt(isoDateMatch[1]);
+    if (month >= 1 && month <= 12) return { year, quarter: Math.ceil(month / 3) };
+  }
+  return { year, quarter: null };
 }
 
 const SACEM_COLUMN_ALIASES = {
@@ -4464,6 +5051,11 @@ async function importSacemFolder() {
     // d'entrées pour une poignée de tracks. On additionne les montants par
     // groupe plutôt que de stocker chaque ligne brute individuellement.
     const groups = new Map();
+    // Total NET par trimestre (ou par année si le trimestre n'est pas
+    // isolable dans "Période d'exploitation") — indépendant du matching
+    // track par track, sert uniquement à visualiser l'évolution globale du
+    // catalogue dans le temps (carte "Évolution" de l'onglet Aperçu).
+    const quarterTotals = new Map();
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx];
       const titre = idx.titre !== -1 ? (row[idx.titre] || "").trim() : "";
@@ -4473,6 +5065,12 @@ async function importSacemFolder() {
       const periode = idx.periode !== -1 ? (row[idx.periode] || "").trim() : "";
       const yearMatch = /^(\d{4})/.exec(periode);
       const year = yearMatch ? yearMatch[1] : null;
+
+      const pq = parseSacemPeriodeQuarter(periode);
+      if (pq.year) {
+        const qKey = pq.year + (pq.quarter ? "-T" + pq.quarter : "");
+        quarterTotals.set(qKey, (quarterTotals.get(qKey) || 0) + (idx.montantNet !== -1 ? parseSacemAmount(row[idx.montantNet]) : 0));
+      }
 
       // Excel exporte parfois "Code de l'oeuvre" en notation scientifique
       // (ex: "1,111E+11") quand le nombre est trop long pour la cellule —
@@ -4590,6 +5188,7 @@ async function importSacemFolder() {
         rowCount: rawRowCount,
         entryCount: groupCount,
         matchedCount: fileMatched,
+        quarterTotals: Object.fromEntries(quarterTotals),
       });
       totalRows += groupCount;
       totalMatched += fileMatched;
@@ -4732,6 +5331,45 @@ function toggleSacemGroupDetails(detailId, headerEl) {
   if (chevron) chevron.style.transform = opening ? "rotate(90deg)" : "rotate(0deg)";
 }
 
+let sacemActiveTab = "overview";
+function toggleSacemRoiRest(btn) {
+  const rest = document.getElementById("sacem-roi-rest");
+  if (!rest) return;
+  const opening = rest.style.display === "none";
+  rest.style.display = opening ? "block" : "none";
+  const chevron = btn.querySelector(".sacem-chevron");
+  if (chevron) chevron.style.transform = opening ? "rotate(90deg)" : "rotate(0deg)";
+}
+
+function toggleSacemMoodCombo(btn) {
+  const rest = document.getElementById("sacem-mood-combo");
+  if (!rest) return;
+  const opening = rest.style.display === "none";
+  rest.style.display = opening ? "block" : "none";
+  const chevron = btn.querySelector(".sacem-chevron");
+  if (chevron) chevron.style.transform = opening ? "rotate(90deg)" : "rotate(0deg)";
+}
+
+function switchSacemTab(tab) {
+  sacemActiveTab = tab;
+  ["overview","profit","data"].forEach(function(k) {
+    const content = document.getElementById("sacem-tab-content-" + k);
+    if (content) content.style.display = k === tab ? "block" : "none";
+    const btn = document.getElementById("sacem-tab-btn-" + k);
+    if (btn) {
+      btn.style.borderBottomColor = k === tab ? "#A78BFA" : "transparent";
+      btn.style.color = k === tab ? "#F0EEF8" : "#7B78A8";
+    }
+  });
+}
+
+function toggleSacemHideNoRevenue(checked) {
+  if (!S.settings) S.settings = {};
+  S.settings.sacemHideNoRevenue = !!checked;
+  save();
+  renderSacemPage();
+}
+
 function renderSacemPage() {
   const imports = S.sacemImports || [];
   const entries = S.sacemEntries || [];
@@ -4748,6 +5386,16 @@ function renderSacemPage() {
   const duplicatesList = document.getElementById("sacem-duplicates-list");
   const roiCard = document.getElementById("sacem-roi-card");
   const roiList = document.getElementById("sacem-roi-list");
+  const moodCard = document.getElementById("sacem-mood-card");
+  const moodList = document.getElementById("sacem-mood-list");
+  const editeurCard = document.getElementById("sacem-editeur-card");
+  const editeurList = document.getElementById("sacem-editeur-list");
+  const albumCard = document.getElementById("sacem-album-card");
+  const albumGrid = document.getElementById("sacem-album-grid");
+  const albumDetail = document.getElementById("sacem-album-detail");
+  const albumGlobalStats = document.getElementById("sacem-album-globalstats");
+  const evolutionCard = document.getElementById("sacem-evolution-card");
+  const evolutionList = document.getElementById("sacem-evolution-list");
 
   // Avertissement doublons — affiché indépendamment de tout import, dès
   // qu'un titre est partagé par plusieurs tracks du catalogue.
@@ -4769,6 +5417,15 @@ function renderSacemPage() {
     matchedCard.style.display = "none";
     summaryCard.style.display = "none";
     roiCard.style.display = "none";
+    moodCard.style.display = "none";
+    editeurCard.style.display = "none";
+    albumCard.style.display = "none";
+    if (albumDetail) albumDetail.style.display = "none";
+    if (albumGlobalStats) albumGlobalStats.innerHTML = "";
+    evolutionCard.style.display = "none";
+    const dataBadgeEmpty = document.getElementById("sacem-tab-badge-data");
+    if (dataBadgeEmpty) dataBadgeEmpty.style.display = "none";
+    switchSacemTab(sacemActiveTab);
     return;
   }
 
@@ -4805,8 +5462,65 @@ function renderSacemPage() {
   // lignes non reliées, même celles d'une répartition décochée).
   const activeEntries = entries.filter(e => !sacemExcludedImportIds.has(e.importId));
 
+  // Évolution du catalogue — total NET par trimestre (ou par année), tous
+  // imports actifs confondus, calculé à partir de quarterTotals (rempli à
+  // l'import, indépendamment du matching track par track — voir plus haut).
+  // Vue volontairement macro : la fiabilité du matching ligne par ligne sur
+  // des centaines de tracks est limitée, une tendance globale l'est moins.
+  const activeImports = imports.filter(imp => !sacemExcludedImportIds.has(imp.id));
+  const importsMissingQuarterData = activeImports.filter(imp => !imp.quarterTotals).length;
+  const periodTotals = {};
+  activeImports.forEach(imp => {
+    if (!imp.quarterTotals) return;
+    Object.entries(imp.quarterTotals).forEach(([key, amount]) => {
+      periodTotals[key] = (periodTotals[key] || 0) + amount;
+    });
+  });
+  const periodArr = Object.keys(periodTotals).map(key => {
+    const m = /^(\d{4})(?:-T([1-4]))?$/.exec(key);
+    const year = m ? parseInt(m[1]) : 0;
+    const quarter = m && m[2] ? parseInt(m[2]) : null;
+    return { key, year, quarter, total: periodTotals[key], sortKey: year * 10 + (quarter || 0) };
+  }).sort((a, b) => a.sortKey - b.sortKey);
+
+  if (!periodArr.length) {
+    evolutionCard.style.display = "none";
+  } else {
+    evolutionCard.style.display = "block";
+    const maxPeriodTotal = Math.max(0, ...periodArr.map(p => p.total));
+    const byKey = {};
+    periodArr.forEach(p => { byKey[p.key] = p; });
+    const evolutionRows = periodArr.map(p => {
+      const label = p.quarter ? p.year + " · T" + p.quarter : String(p.year);
+      const prevKey = p.quarter ? (p.year - 1) + "-T" + p.quarter : String(p.year - 1);
+      const prev = byKey[prevKey];
+      let deltaHtml = "";
+      if (prev && prev.total > 0) {
+        const deltaPct = ((p.total - prev.total) / prev.total) * 100;
+        const deltaColor = deltaPct >= 0 ? "#10B981" : "#F87171";
+        deltaHtml = '<span style="font-size:10px;color:' + deltaColor + ';font-weight:700;margin-left:6px" title="' + (t("sacem_evolution_vs_prev")||"vs") + ' ' + (t("sacem_evolution_same_period")||"même période l\'an dernier") + '">' + (deltaPct >= 0 ? "+" : "") + deltaPct.toFixed(0) + '%</span>';
+      }
+      return '<div style="margin-bottom:9px">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#C4C0E8;margin-bottom:3px">'
+        + '<span>' + label + deltaHtml + '</span>'
+        + '<span style="color:' + sacemAmountColor(p.total, maxPeriodTotal) + ';font-weight:700;white-space:nowrap">' + p.total.toFixed(2) + ' €</span>'
+        + '</div>'
+        + '<div style="height:6px;background:#1E1C38;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + (maxPeriodTotal ? Math.max(4, Math.round(p.total/maxPeriodTotal*100)) : 0) + '%;background:linear-gradient(90deg,#7C3AED,#A78BFA);border-radius:3px"></div></div>'
+        + '</div>';
+    }).join("");
+    const partialNotice = importsMissingQuarterData
+      ? '<div style="font-size:10px;color:#FB923C;margin-top:4px">' + (t("sacem_evolution_partial_data")||"{n} import(s) plus ancien(s) ne contribue(nt) pas encore à ce graphique — réimporte-les pour les inclure.").replace("{n}", importsMissingQuarterData) + '</div>'
+      : '';
+    evolutionList.innerHTML = evolutionRows + partialNotice;
+  }
+
   // Lignes à valider
   const toReview = entries.filter(e => !e.matchedTrackId && !e.ignored);
+  const dataBadge = document.getElementById("sacem-tab-badge-data");
+  if (dataBadge) {
+    if (toReview.length) { dataBadge.style.display = "inline-block"; dataBadge.textContent = toReview.length; }
+    else dataBadge.style.display = "none";
+  }
   if (toReview.length) {
     reviewCard.style.display = "block";
     const flat = allTracksFlat();
@@ -4961,13 +5675,22 @@ function renderSacemPage() {
     if (!byTrack[key]) {
       const proj = (S.projects||[]).find(p=>p.id===e.matchedProjectId);
       const track = proj && proj.tracks.find(t=>t.id===e.matchedTrackId);
-      byTrack[key] = { title: track ? (track.title||"Sans titre") : "?", total: 0 };
+      byTrack[key] = { title: track ? (track.title||"Sans titre") : "?", editeur: (proj&&proj.editeur)||"", total: 0, details: new Map() };
     }
     byTrack[key].total += (e.montantNet || 0);
     if (e.year) {
       if (!byTrackYears[key]) byTrackYears[key] = new Set();
       byTrackYears[key].add(e.year);
     }
+    // Fusionne les sous-détails (show/pays/type/diffuseur) — sert à afficher
+    // "où" la track a performé directement dans la carte Rentabilité.
+    (e.details || []).forEach(d => {
+      const dk = d.titreLie + "|" + d.pays + "|" + d.typeUtil + "|" + d.utilisateurs;
+      let gd = byTrack[key].details.get(dk);
+      if (!gd) { gd = { ...d, rowCount: 0, montantNet: 0 }; byTrack[key].details.set(dk, gd); }
+      gd.rowCount += d.rowCount;
+      gd.montantNet += d.montantNet;
+    });
   });
   const top10Tracks = Object.values(byTrack).sort((a,b)=>b.total-a.total).slice(0,10);
   const maxTrackAmount = Math.max(0, ...top10Tracks.map(x => x.total));
@@ -4993,16 +5716,19 @@ function renderSacemPage() {
   allTracksFlat().forEach(x => {
     if (!x.track.logicTimeSpent) return;
     const key = x.project.id + "-" + x.track.id;
-    roiMap.set(key, { title: x.track.title||"Sans titre", album: x.project.title||"", seconds: x.track.logicTimeSpent, revenue: 0, years: 0 });
+    roiMap.set(key, { title: x.track.title||"Sans titre", album: x.project.title||"", albumId: x.project.id, cover: x.project.cover||null, editeur: x.project.editeur||"", seconds: x.track.logicTimeSpent, revenue: 0, years: 0, moods: x.track.moods||[], showDetails: [] });
   });
   Object.keys(byTrack).forEach(key => {
     const yearsCount = byTrackYears[key] ? byTrackYears[key].size : 1;
+    const showDetails = Array.from(byTrack[key].details.values()).sort((a,b) => b.montantNet - a.montantNet);
     const existing = roiMap.get(key);
-    if (existing) { existing.revenue = byTrack[key].total; existing.years = yearsCount; }
+    if (existing) { existing.revenue = byTrack[key].total; existing.years = yearsCount; existing.showDetails = showDetails; if (!existing.editeur) existing.editeur = byTrack[key].editeur||""; }
     else {
       const pid = parseInt(key.split("-")[0]);
       const proj = (S.projects||[]).find(p=>p.id===pid);
-      roiMap.set(key, { title: byTrack[key].title, album: proj?(proj.title||""):"", seconds: 0, revenue: byTrack[key].total, years: yearsCount });
+      const tid = parseInt(key.split("-")[1]);
+      const trk = proj && proj.tracks.find(t=>t.id===tid);
+      roiMap.set(key, { title: byTrack[key].title, album: proj?(proj.title||""):"", albumId: pid, cover: proj?(proj.cover||null):null, editeur: byTrack[key].editeur||"", seconds: 0, revenue: byTrack[key].total, years: yearsCount, moods: (trk&&trk.moods)||[], showDetails: showDetails });
     }
   });
   const roiArr = Array.from(roiMap.values()).map(v => {
@@ -5018,15 +5744,27 @@ function renderSacemPage() {
     roiList.innerHTML = '<div style="font-size:12px;color:#5B5880">' + (t("sacem_roi_empty")||"Aucune track avec du temps Logic ET des revenus SACEM pour l'instant.") + '</div>';
   } else {
     roiCard.style.display = "block";
-    if (typeof sacemRoiLimit === "undefined" || sacemRoiLimit === null) sacemRoiLimit = 30;
-    const visibleRoi = roiSorted.slice(0, sacemRoiLimit);
     const maxRevenue = Math.max(0, ...roiSorted.map(v => v.revenue));
     const maxPerHourPerYear = Math.max(0, ...roiWithTime.map(v => v.perHourPerYear));
-    const roiRows = visibleRoi.map(v =>
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #1E1C38;flex-wrap:wrap">'
+    let roiRowIdx = 0;
+    const roiRowHtml = (v) => {
+      const hasShows = (v.showDetails||[]).length > 0;
+      const rowId = "sacem-roi-shows-" + (roiRowIdx++);
+      const maxShowAmount = hasShows ? Math.max(0, ...v.showDetails.map(d => d.montantNet)) : 0;
+      const showsRows = hasShows ? v.showDetails.map(d =>
+        '<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #1E1C38;font-size:11px">'
+        + '<span style="color:#C4C0E8;flex:1;display:inline-flex;align-items:center;gap:4px">' + (d.titreLie ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M20.2 6L3 11l-.9-2.4c-.3-1.1.4-2.2 1.5-2.5L18.8 2c1.1-.3 2.2.4 2.5 1.5L20.2 6z"/><path d="M3 11l17.2-5"/><path d="M3 11v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9"/><line x1="7.5" y1="6.5" x2="9.5" y2="10"/><line x1="12" y1="5.3" x2="14" y2="8.8"/></svg><span>' + escapeHtml(d.titreLie) + '</span>' : (t("sacem_no_show")||"Show non renseigné")) + '</span>'
+        + '<span style="color:#5B5880;white-space:nowrap">' + [d.typeUtil, d.utilisateurs, d.pays].filter(Boolean).map(escapeHtml).join(" · ") + '</span>'
+        + '<span style="color:' + sacemAmountColor(d.montantNet, maxShowAmount) + ';font-weight:700;white-space:nowrap">' + d.montantNet.toFixed(2) + ' €</span>'
+        + '</div>'
+      ).join("") : '';
+      return '<div style="border-bottom:1px solid #1E1C38">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;flex-wrap:wrap' + (hasShows ? ';cursor:pointer' : '') + '"' + (hasShows ? ' onclick="toggleSacemGroupDetails(\'' + rowId + '\', this)"' : '') + '>'
+      + (hasShows ? '<span style="color:#5B5880;font-size:11px;transition:transform 0.15s;margin-right:-4px" class="sacem-chevron">▶</span>' : '')
       + '<div style="flex:1;min-width:140px">'
-      + '<div style="font-size:12px;color:#F0EEF8;font-weight:600">' + v.title + '</div>'
-      + (v.album ? '<div style="font-size:10px;color:#5B5880">' + v.album + (v.years>1 ? ' · ' + v.years + ' ' + (t("sacem_roi_years")||"ans") : '') + '</div>' : '')
+      + '<div style="font-size:12px;color:#F0EEF8;font-weight:600">' + escapeHtml(v.title) + '</div>'
+      + (v.album ? '<div style="font-size:10px;color:#5B5880">' + escapeHtml(v.album) + (v.years>1 ? ' · ' + v.years + ' ' + (t("sacem_roi_years")||"ans") : '') + '</div>' : '')
+      + ((v.moods||[]).length ? '<div style="margin-top:3px">' + v.moods.slice(0,3).map(m=>'<span style="font-size:9px;color:#A78BFA;border:1px solid rgba(124,58,237,0.3);background:rgba(124,58,237,0.08);padding:1px 6px;border-radius:100px;font-weight:600;margin-right:3px">'+escapeHtml(m)+'</span>').join("") + '</div>' : '')
       + '</div>'
       + '<div style="font-size:11px;color:#60A5FA;white-space:nowrap;min-width:70px;text-align:right">' + (v.seconds > 0 ? formatLogicDuration(v.seconds) : '<span style="color:#5B5880">' + (t("sacem_roi_no_time")||"Temps non suivi") + '</span>') + '</div>'
       + '<div style="font-size:12px;font-weight:700;color:' + sacemAmountColor(v.revenue, maxRevenue) + ';white-space:nowrap;min-width:60px;text-align:right">' + v.revenue.toFixed(2) + ' €</div>'
@@ -5034,13 +5772,295 @@ function renderSacemPage() {
       + (v.perHourPerYear !== null ? v.perHourPerYear.toFixed(2) + ' ' + (t("sacem_roi_per_hour")||"€/h/an") : '—')
       + '</div>'
       + '</div>'
-    ).join("");
-    roiList.innerHTML = roiRows;
-    if (roiSorted.length > visibleRoi.length) {
-      roiList.innerHTML += '<div style="text-align:center;padding-top:10px">'
-        + '<button onclick="sacemRoiLimit += 30; renderSacemPage()" style="background:#1E1C38;border:1px solid #2A2750;color:#A78BFA;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer">'
-        + (t("sacem_roi_load_more")||"Afficher 30 de plus")
+      + (hasShows ? '<div id="' + rowId + '" style="display:none;padding:2px 0 8px 17px">' + showsRows + '</div>' : '')
+      + '</div>';
+    };
+
+    // Seul le top 3 reste visible d'entrée — le reste du classement est
+    // replié par défaut derrière un accordéon, pour éviter la liste
+    // interminable qui rendait cette carte peu exploitable d'un coup d'oeil.
+    const TOP_N = 3;
+    const topRows = roiSorted.slice(0, TOP_N).map(roiRowHtml).join("");
+    const rest = roiSorted.slice(TOP_N);
+
+    let restBlockHtml = "";
+    if (rest.length) {
+      if (typeof sacemRoiLimit === "undefined" || sacemRoiLimit === null) sacemRoiLimit = 30;
+      const visibleRest = rest.slice(0, sacemRoiLimit);
+      const restRows = visibleRest.map(roiRowHtml).join("");
+      const loadMoreHtml = rest.length > visibleRest.length
+        ? '<div style="text-align:center;padding-top:10px">'
+          + '<button onclick="sacemRoiLimit += 30; renderSacemPage()" style="background:#1E1C38;border:1px solid #2A2750;color:#A78BFA;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer">'
+          + (t("sacem_roi_load_more")||"Afficher 30 de plus")
+          + '</button></div>'
+        : '';
+      restBlockHtml = '<div id="sacem-roi-rest" style="display:none;margin-top:2px;padding-top:8px;border-top:1px dashed #2A2750">' + restRows + loadMoreHtml + '</div>'
+        + '<div style="text-align:center;margin-top:10px">'
+        + '<button onclick="toggleSacemRoiRest(this)" style="background:transparent;border:1px solid #2A2750;color:#A78BFA;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">'
+        + '<span class="sacem-chevron" style="transition:transform 0.15s;display:inline-block">▶</span>'
+        + '<span>' + (t("sacem_roi_see_all")||"Voir le classement complet") + ' (' + rest.length + ')</span>'
         + '</button></div>';
+    }
+
+    roiList.innerHTML = topRows + restBlockHtml;
+  }
+
+  // Rentabilité par album — grille visuelle avec covers. Pool tous les
+  // tracks d'un même album (pas seulement ceux qui ont à la fois temps ET
+  // revenu comme roiWithTime) : un album agrège naturellement plus de
+  // données qu'une track isolée, donc plus robuste, et la somme du revenu
+  // annualisé rapportée à la somme du temps donne un ratio pondéré par
+  // track plutôt qu'une simple moyenne de ratios.
+  if (albumCard && albumGrid) {
+    const albumGroups = {};
+    roiArr.forEach(v => {
+      if (v.albumId == null) return;
+      if (!albumGroups[v.albumId]) albumGroups[v.albumId] = { albumId: v.albumId, album: v.album, cover: v.cover, revenue: 0, seconds: 0, annualRevenue: 0, secondsWithRevenue: 0 };
+      const g = albumGroups[v.albumId];
+      g.revenue += v.revenue;
+      g.seconds += v.seconds;
+      if (v.seconds > 0 && v.revenue > 0) { g.annualRevenue += v.annualRevenue; g.secondsWithRevenue += v.seconds; }
+    });
+    let albumArr = Object.values(albumGroups).map(g => ({
+      ...g,
+      perHourPerYear: g.secondsWithRevenue > 0 ? g.annualRevenue / (g.secondsWithRevenue / 3600) : null,
+    })).sort((a,b) => b.revenue - a.revenue);
+
+    // Masque les albums sans aucun revenu SACEM perçu (typiquement des albums
+    // encore en cours de production) — n'a d'intérêt que sur cette vue
+    // rentabilité, donc ne touche à rien d'autre dans l'appli.
+    const hideNoRevenue = (S.settings||{}).sacemHideNoRevenue !== false;
+    const hideCheckbox = document.getElementById("sacem-hide-no-revenue");
+    if (hideCheckbox) hideCheckbox.checked = hideNoRevenue;
+    const albumArrAll = albumArr;
+    if (hideNoRevenue) albumArr = albumArr.filter(g => g.revenue > 0);
+
+    // Panneau de stats globales — toujours affiché, indépendamment de
+    // l'album sélectionné (contrairement au détail, ancré juste en dessous
+    // dans la même colonne collante).
+    if (albumGlobalStats) {
+      const totalLogicSeconds = allTracksFlat().reduce((s,x) => s + (x.track.logicTimeSpent||0), 0);
+      const trackedTrackCount = roiArr.length;
+      // Nombre de shows/programmes distincts où au moins une track a été
+      // diffusée — même source que le détail "où a-t-elle performé" par
+      // track (titreLie), agrégée sur l'ensemble du catalogue matché.
+      const distinctShows = new Set();
+      matched.forEach(e => (e.details||[]).forEach(d => { if (d.titreLie) distinctShows.add(d.titreLie); }));
+      const statRow = (label, value, color) =>
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;border-bottom:1px solid #1E1C38">'
+        + '<span style="font-size:13px;color:#7B78A8">' + label + '</span>'
+        + '<span style="font-size:20px;font-weight:800;color:' + color + '">' + value + '</span>'
+        + '</div>';
+      albumGlobalStats.innerHTML =
+        '<div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px">' + (t("sacem_album_global_title")||"Vue d'ensemble") + '</div>'
+        + statRow(t("sacem_album_global_total")||"Total SACEM", totalNet.toFixed(2) + ' €', '#10B981')
+        + statRow(t("sacem_album_global_time")||"Temps Logic cumulé", totalLogicSeconds > 0 ? formatLogicDuration(totalLogicSeconds) : '—', '#60A5FA')
+        + statRow(t("sacem_album_global_albums")||"Albums suivis", String(albumArrAll.length), '#F0EEF8')
+        + statRow(t("sacem_album_global_tracks")||"Tracks suivies", String(trackedTrackCount), '#F0EEF8')
+        + statRow(t("sacem_album_global_shows")||"Shows différents", String(distinctShows.size), '#FBBF24');
+    }
+
+    if (!albumArr.length) {
+      albumCard.style.display = "block";
+      albumGrid.innerHTML = '<div style="font-size:12px;color:#5B5880;grid-column:1/-1">'
+        + (hideNoRevenue && albumArrAll.length
+          ? (t("sacem_album_empty_filtered")||"Tous les albums suivis sont masqués (aucun n'a encore de revenu SACEM) — décoche \"Masquer les albums sans revenu\" pour les voir.")
+          : (t("sacem_album_empty") || "Aucun album avec du temps ET des revenus pour calculer ça pour l'instant."))
+        + '</div>';
+      albumDetail.style.display = "none";
+    } else {
+      albumCard.style.display = "block";
+      albumGrid.innerHTML = albumArr.map(g => {
+        const isSelected = sacemExpandedAlbumId === g.albumId;
+        const coverHtml = g.cover
+          ? '<img src="' + g.cover + '" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'
+          : '<div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, #1E1C38, #2A1F5C)">'
+            + '<div style="font-size:32px;font-weight:900;color:#3D3A70;letter-spacing:-2px">' + escapeHtml((g.album||"?").charAt(0).toUpperCase()) + '</div>'
+            + '</div>';
+        return '<div style="background:#13122A;border:1px solid ' + (isSelected ? '#A78BFA' : '#2A2750') + ';border-radius:10px;overflow:hidden;cursor:pointer" onclick="toggleSacemAlbumDetail(' + g.albumId + ')">'
+          + coverHtml
+          + '<div style="padding:10px">'
+          + '<div style="font-size:12px;color:#F0EEF8;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(g.album||"?") + '</div>'
+          + '<div style="font-size:9px;color:#5B5880;margin-bottom:6px">' + (t("sacem_album_since")||"Depuis") + ' ' + albumSinceLabel(g.albumId) + '</div>'
+          + '<div style="font-size:11px;color:#10B981;font-weight:700">' + g.revenue.toFixed(2) + ' €</div>'
+          + '<div style="font-size:10px;color:#60A5FA">' + (g.seconds > 0 ? formatLogicDuration(g.seconds) : (t("sacem_roi_no_time")||"Temps non suivi")) + '</div>'
+          + (g.perHourPerYear !== null ? '<div style="font-size:10px;color:#A78BFA;font-weight:700;margin-top:2px">' + g.perHourPerYear.toFixed(2) + ' ' + (t("sacem_roi_per_hour")||"€/h/an") + '</div>' : '')
+          + '</div>'
+          + '</div>';
+      }).join("");
+
+      // Détail d'un album sélectionné : chaque track, son total, et sa
+      // ventilation par année — construit à partir des lignes reliées
+      // (matched) filtrées sur cet album.
+      const selectedAlbum = albumArr.find(g => g.albumId === sacemExpandedAlbumId);
+      if (!selectedAlbum) {
+        albumDetail.style.display = "none";
+      } else {
+        albumDetail.style.display = "block";
+        const trackYearMap = {};
+        matched.filter(e => e.matchedProjectId === selectedAlbum.albumId).forEach(e => {
+          const tid = e.matchedTrackId;
+          if (!trackYearMap[tid]) {
+            const proj = (S.projects||[]).find(p=>p.id===e.matchedProjectId);
+            const track = proj && proj.tracks.find(t=>t.id===tid);
+            trackYearMap[tid] = { title: track ? (track.title||"Sans titre") : "?", total: 0, byYear: {} };
+          }
+          trackYearMap[tid].total += (e.montantNet || 0);
+          const y = e.year || "?";
+          trackYearMap[tid].byYear[y] = (trackYearMap[tid].byYear[y] || 0) + (e.montantNet || 0);
+        });
+        // Sélecteur d'année — "Total" (tous les revenus de la track sur
+        // l'album, tous exercices confondus) ou une année précise (classe
+        // et affiche alors uniquement ce que chaque track a rapporté CETTE
+        // année-là, plutôt que son cumul).
+        const availableYears = Array.from(new Set(Object.values(trackYearMap).flatMap(x => Object.keys(x.byYear)))).sort().reverse();
+        if (sacemAlbumDetailYear !== "all" && !availableYears.includes(sacemAlbumDetailYear)) sacemAlbumDetailYear = "all";
+        const yearPillsHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">'
+          + '<button onclick="setSacemAlbumDetailYear(\'all\')" style="background:' + (sacemAlbumDetailYear==="all"?"#7C3AED":"#1E1C38") + ';border:1px solid ' + (sacemAlbumDetailYear==="all"?"#A78BFA":"#2A2750") + ';color:' + (sacemAlbumDetailYear==="all"?"#F0EEF8":"#7B78A8") + ';border-radius:100px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer">' + (t("sacem_album_year_total")||"Total") + '</button>'
+          + availableYears.map(y =>
+              '<button onclick="setSacemAlbumDetailYear(\'' + y + '\')" style="background:' + (sacemAlbumDetailYear===y?"#7C3AED":"#1E1C38") + ';border:1px solid ' + (sacemAlbumDetailYear===y?"#A78BFA":"#2A2750") + ';color:' + (sacemAlbumDetailYear===y?"#F0EEF8":"#7B78A8") + ';border-radius:100px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer">' + y + '</button>'
+            ).join("")
+          + '</div>';
+
+        const trackArrBase = Object.values(trackYearMap);
+        const getAmount = (x) => sacemAlbumDetailYear === "all" ? x.total : (x.byYear[sacemAlbumDetailYear] || 0);
+        const trackArr = trackArrBase.filter(x => sacemAlbumDetailYear === "all" || x.byYear[sacemAlbumDetailYear]).sort((a,b) => getAmount(b) - getAmount(a));
+        const displayedTotal = sacemAlbumDetailYear === "all" ? selectedAlbum.revenue : trackArrBase.reduce((s,x) => s + getAmount(x), 0);
+        const maxTrackTotal = Math.max(0, ...trackArr.map(x => getAmount(x)));
+        const trackRowsHtml = trackArr.length ? trackArr.map(x => {
+          const amount = getAmount(x);
+          const yearsHtml = sacemAlbumDetailYear === "all" ? Object.keys(x.byYear).sort().reverse().map(y =>
+            '<span style="display:inline-block;background:#1E1C38;border-radius:100px;padding:3px 10px;font-size:11px;color:#7B78A8;margin-right:6px;margin-top:6px">' + y + ' : <span style="color:#A78BFA;font-weight:700">' + x.byYear[y].toFixed(2) + ' €</span></span>'
+          ).join("") : "";
+          return '<div style="padding:14px 0;border-bottom:1px solid #1E1C38">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
+            + '<span style="font-size:15px;color:#F0EEF8;font-weight:700">' + escapeHtml(x.title) + '</span>'
+            + '<span style="font-size:16px;font-weight:800;color:' + sacemAmountColor(amount, maxTrackTotal) + '">' + amount.toFixed(2) + ' €</span>'
+            + '</div>'
+            + '<div style="height:7px;background:#1E1C38;border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;width:' + (maxTrackTotal ? Math.max(4, Math.round(amount/maxTrackTotal*100)) : 0) + '%;background:linear-gradient(90deg,#7C3AED,#A78BFA);border-radius:3px"></div></div>'
+            + (yearsHtml ? '<div>' + yearsHtml + '</div>' : '')
+            + '</div>';
+        }).join("") : '<div style="font-size:13px;color:#5B5880">' + (sacemAlbumDetailYear === "all" ? (t("sacem_album_no_track_detail")||"Aucune track reliée pour cet album pour l'instant.") : (t("sacem_album_no_track_year")||"Aucune track n'a rapporté sur cette année pour cet album.")) + '</div>';
+
+        const headerCoverHtml = selectedAlbum.cover
+          ? '<img src="' + selectedAlbum.cover + '" style="width:64px;height:64px;border-radius:10px;object-fit:cover;box-shadow:0 4px 12px rgba(0,0,0,0.4)">'
+          : '<div style="width:64px;height:64px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, #1E1C38, #2A1F5C)">'
+            + '<div style="font-size:24px;font-weight:900;color:#3D3A70">' + escapeHtml((selectedAlbum.album||"?").charAt(0).toUpperCase()) + '</div>'
+            + '</div>';
+
+        const sinceHtml = '<div style="display:flex;align-items:center;gap:6px">'
+          + '<span>' + (t("sacem_album_since")||"Depuis") + '</span>'
+          + '<input type="month" value="' + albumSinceValue(selectedAlbum.albumId) + '" onclick="event.stopPropagation()" onchange="saveAlbumSinceDate(' + selectedAlbum.albumId + ', this.value, event)" title="' + (t("sacem_album_edit_date_hint")||"Corriger la date réelle si besoin") + '" style="background:#1E1C38;border:1px solid #2A2750;border-radius:6px;color:#F0EEF8;font-size:12px;padding:2px 6px;cursor:pointer">'
+          + '</div>';
+
+        albumDetail.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #2A2750">'
+          + headerCoverHtml
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:18px;font-weight:800;color:#F0EEF8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(selectedAlbum.album||"?") + '</div>'
+          + '<div style="font-size:13px;color:#5B5880">' + sinceHtml + '</div>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<div style="font-size:22px;font-weight:800;color:#10B981">' + displayedTotal.toFixed(2) + ' €</div>'
+          + '<div style="font-size:11px;color:#60A5FA">' + (sacemAlbumDetailYear !== "all" ? sacemAlbumDetailYear : (selectedAlbum.seconds > 0 ? formatLogicDuration(selectedAlbum.seconds) : (t("sacem_roi_no_time")||"Temps non suivi"))) + '</div>'
+          + '</div>'
+          + '</div>'
+          + yearPillsHtml
+          + trackRowsHtml;
+      }
+    }
+  }
+
+  // Rentabilité par éditeur — vue principale de cet onglet : regroupe le
+  // même calcul (€/h/an) par éditeur plutôt que par mood. Échantillon par
+  // groupe généralement bien plus grand (un éditeur couvre tout un pan du
+  // catalogue), donc plus représentatif, et l'info est directement
+  // actionnable (avec quel éditeur mon temps est-il le mieux valorisé).
+  const groupRowHtml = (g, maxAvg) =>
+    '<div style="margin-bottom:9px">'
+    + '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#C4C0E8;margin-bottom:3px">'
+    + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(g.label) + ' <span style="color:#5B5880;font-size:10px">(' + g.count + (g.count>1?(t("sacem_mood_tracks")||" tracks"):(t("sacem_mood_track")||" track")) + ')</span></span>'
+    + '<span style="color:' + sacemAmountColor(g.avg, maxAvg) + ';font-weight:700;white-space:nowrap">' + g.avg.toFixed(2) + ' ' + (t("sacem_roi_per_hour")||"€/h/an") + '</span>'
+    + '</div>'
+    + '<div style="height:6px;background:#1E1C38;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + (maxAvg ? Math.max(4, Math.round(g.avg/maxAvg*100)) : 0) + '%;background:linear-gradient(90deg,#7C3AED,#A78BFA);border-radius:3px"></div></div>'
+    + '</div>';
+
+  if (editeurCard && editeurList) {
+    const editeurGroups = {};
+    roiWithTime.forEach(v => {
+      const label = v.editeur || (t("sacem_no_editeur") || "Sans éditeur");
+      if (!editeurGroups[label]) editeurGroups[label] = { label, sum: 0, count: 0 };
+      editeurGroups[label].sum += v.perHourPerYear;
+      editeurGroups[label].count += 1;
+    });
+    const editeurArr = Object.values(editeurGroups).map(g => ({ ...g, avg: g.sum / g.count })).sort((a,b) => b.avg - a.avg);
+    if (!editeurArr.length) {
+      editeurCard.style.display = "block";
+      editeurList.innerHTML = '<div style="font-size:12px;color:#5B5880">' + (t("sacem_mood_empty") || "Aucune track avec du temps ET des revenus pour calculer ça pour l'instant.") + '</div>';
+    } else {
+      editeurCard.style.display = "block";
+      const maxEditeurAvg = Math.max(0, ...editeurArr.map(g => g.avg));
+      editeurList.innerHTML = editeurArr.map(g => groupRowHtml(g, maxEditeurAvg)).join("");
+    }
+  }
+
+  // Rentabilité par mood — DEUX vues :
+  // 1) "Par mood individuel" (vue principale, toujours visible) : chaque tag
+  //    de mood pris séparément. Une track "Action + Epic" contribue à la fois
+  //    au groupe "Action" ET au groupe "Epic" — ça permet de voir si "Action"
+  //    performe bien en général, peu importe le mood secondaire qui l'accompagne,
+  //    avec un échantillon (count) forcément plus grand donc plus lisible.
+  // 2) "Par combinaison exacte" (repliée derrière un accordéon) : l'ancien
+  //    calcul, qui distingue "Dark + Fantasy" de "Dark + Neo-Classic" — utile
+  //    pour du détail fin, mais avec des groupes souvent trop petits pour être
+  //    comparés sérieusement seuls (d'où le repli par défaut).
+  if (moodCard && !SACEM_MOOD_CARD_ENABLED) {
+    moodCard.style.display = "none";
+  } else if (moodCard && moodList) {
+    const buildMoodGroups = (v) => (v.moods && v.moods.length) ? v.moods : [(t("sacem_mood_none") || "Sans mood")];
+
+    const soloGroups = {};
+    roiWithTime.forEach(v => {
+      buildMoodGroups(v).forEach(tag => {
+        if (!soloGroups[tag]) soloGroups[tag] = { label: tag, sum: 0, count: 0 };
+        soloGroups[tag].sum += v.perHourPerYear;
+        soloGroups[tag].count += 1;
+      });
+    });
+    const soloArr = Object.values(soloGroups).map(g => ({ ...g, avg: g.sum / g.count })).sort((a,b) => b.avg - a.avg);
+
+    const comboGroups = {};
+    roiWithTime.forEach(v => {
+      const label = (v.moods && v.moods.length) ? v.moods.slice().sort().join(" + ") : (t("sacem_mood_none") || "Sans mood");
+      if (!comboGroups[label]) comboGroups[label] = { label, sum: 0, count: 0 };
+      comboGroups[label].sum += v.perHourPerYear;
+      comboGroups[label].count += 1;
+    });
+    const comboArr = Object.values(comboGroups).map(g => ({ ...g, avg: g.sum / g.count })).sort((a,b) => b.avg - a.avg);
+
+    if (!soloArr.length) {
+      moodCard.style.display = "block";
+      moodList.innerHTML = '<div style="font-size:12px;color:#5B5880">' + (t("sacem_mood_empty") || "Aucune track avec du temps ET des revenus pour calculer ça pour l'instant.") + '</div>';
+    } else {
+      moodCard.style.display = "block";
+      const maxSoloAvg = Math.max(0, ...soloArr.map(g => g.avg));
+      const soloHtml = soloArr.map(g => groupRowHtml(g, maxSoloAvg)).join("");
+
+      const maxComboAvg = Math.max(0, ...comboArr.map(g => g.avg));
+      const comboHtml = comboArr.map(g => groupRowHtml(g, maxComboAvg)).join("");
+      const singleCount = comboArr.filter(g => g.count === 1).length;
+      const comboCaveat = singleCount
+        ? '<div style="font-size:11px;color:#FB923C;margin-bottom:10px">' + (t("sacem_mood_combo_caveat") || "Attention, {n} de ces combinaisons ne reposent que sur une seule track — à prendre avec des pincettes.").replace("{n}", singleCount) + '</div>'
+        : '';
+
+      moodList.innerHTML =
+        '<div style="font-size:11px;color:#5B5880;margin-bottom:10px">' + (t("sacem_mood_solo_hint") || "Chaque mood pris séparément — une track \"Action + Epic\" compte dans les deux groupes \"Action\" et \"Epic\".") + '</div>'
+        + soloHtml
+        + '<div style="text-align:center;margin-top:6px">'
+        + '<button onclick="toggleSacemMoodCombo(this)" style="background:transparent;border:1px solid #2A2750;color:#A78BFA;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">'
+        + '<span class="sacem-chevron" style="transition:transform 0.15s;display:inline-block">▶</span>'
+        + '<span>' + (t("sacem_mood_see_combo") || "Voir le détail par combinaison exacte") + ' (' + comboArr.length + ')</span>'
+        + '</button></div>'
+        + '<div id="sacem-mood-combo" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #2A2750">' + comboCaveat + comboHtml + '</div>';
     }
   }
 
@@ -5054,6 +6074,11 @@ function renderSacemPage() {
     + '<div><div style="font-size:11px;color:#A78BFA;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">' + (t("sacem_by_year")||"Par année") + '</div>' + (yearRows||'<span style="font-size:11px;color:#5B5880">—</span>') + '</div>'
     + '<div><div style="font-size:11px;color:#A78BFA;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">' + (t("sacem_by_track")||"Par track (top 10)") + '</div>' + (trackRows||'<span style="font-size:11px;color:#5B5880">—</span>') + '</div>'
     + '</div>';
+
+  // Réapplique l'état visuel de l'onglet actif (le re-rendu ne touche pas
+  // les conteneurs d'onglets eux-mêmes, mais un premier appel a besoin que
+  // les boutons reflètent bien sacemActiveTab).
+  switchSacemTab(sacemActiveTab);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5260,8 +6285,9 @@ function buildProjCard(p, opts={}) {
   const hasRefused = p.tracks.some(trk=>trk.status==="refused");
   const isDash = opts.dashboard||false;
   const idx = S.projects.indexOf(p);
+  const isAlbumLive = p.tracks.some(trk => isLiveLogicTrack(p.id, trk.id));
 
-  const wrap=el("div","card"+(isExp?" expanded":"")+(pct===100&&!p.archived?" card-complete":""));
+  const wrap=el("div","card"+(isExp?" expanded":"")+(pct===100&&!p.archived?" card-complete":"")+(isAlbumLive?" live-logic-highlight":""));
   wrap.id="proj-"+p.id;
   wrap.style.marginBottom="8px";
   // Remplissage dégradé subtil suivant la couleur de statut/progression
@@ -5330,6 +6356,7 @@ function buildProjCard(p, opts={}) {
         <div class="proj-title">
           ${p.archived?`<span style="font-size:10px;background:#1A1838;color:#4B4870;padding:2px 7px;border-radius:4px;margin-right:4px;border:1px solid #2A2750">${t("archived_badge")}</span>`:""}
           ${p.title} <span class="tag">${p.type}</span>
+          ${isAlbumLive?`<span class="tag" style="color:#34D399;background:#064E3B;display:inline-flex;align-items:center;gap:5px;font-weight:700" title="${t('logic_live_badge')}"><span class="live-logic-dot"></span>${t('logic_live_badge')}</span>`:""}
           ${p.collabs&&p.collabs.length?`<span class="tag" style="color:#38BDF8">👥 ${p.collabs.length+1}</span>`:""}
           ${p.links&&p.links.length?`<span onclick="event.stopPropagation();showResourcePopup(event,${p.id},'links')" style="cursor:pointer;font-size:11px;background:#1E3A5F;color:#60A5FA;padding:2px 7px;border-radius:4px;border:1px solid #60A5FA44;margin-left:2px">🔗 ${p.links.length}</span>`:""}
           ${p.attachments&&p.attachments.length?`<span onclick="event.stopPropagation();showResourcePopup(event,${p.id},'attachments')" style="cursor:pointer;font-size:11px;background:#2D1B69;color:#A78BFA;padding:2px 7px;border-radius:4px;border:1px solid #A78BFA44;margin-left:2px">📎 ${p.attachments.length}</span>`:""}
@@ -5558,6 +6585,9 @@ function buildProjBody(p) {
         <!-- Publisher follow-up -->
         <div onclick="event.stopPropagation()" class="relance-section" style="margin-top:12px;background:#13122A;border:1px solid #2A2750;border-radius:8px;padding:10px 12px">
           <div style="font-size:10px;color:#7B78A8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">${t("relance_title")}</div>
+          <!-- Pas d'alerte "en retard" ici : c'est le statut de chaque track (onglet
+               ci-dessous) qui fait foi. Ce bloc ne sert qu'à garder une trace du
+               dernier contact général avec l'éditeur et de l'historique des relances. -->
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <div>
               <div style="font-size:10px;color:#5B5880;margin-bottom:3px">${t("relance_last")}</div>
@@ -5571,33 +6601,20 @@ function buildProjBody(p) {
                 `}
               </div>
             </div>
-            <div>
-              <div style="font-size:10px;color:#5B5880;margin-bottom:3px">${t("relance_delay")}</div>
-              <input type="number" class="inp" value="${p.relanceDelay||15}" min="1" max="90" style="font-size:11px;padding:4px 8px;width:60px"
-                onchange="setProjField(${p.id},'relanceDelay',parseInt(this.value)||15)">
-            </div>
-            ${p.lastContact && !p.relanceReply ? (() => {
-              const days = Math.floor((new Date() - new Date(p.lastContact)) / 86400000);
-              const delay = p.relanceDelay || 15;
-              const overdue = days >= delay;
-              return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <div style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;background:${overdue?'#450A0A':'#064E3B22'};color:${overdue?'#F87171':'#34D399'};border:1px solid ${overdue?'#F8717133':'#10B98133'}">
-                  ${overdue ? `🚨 ${t("relance_overdue").replace("{n}",days)}` : `✓ ${t("relance_ok").replace("{n}",delay-days)}`}
-                </div>
-                <button onclick="event.stopPropagation();openRelanceReplyModal('album',${p.id})"
-                  style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#10B981;cursor:pointer;font-size:10px;padding:3px 9px;border-radius:5px;font-weight:600">
-                  ✅ ${t("relance_reply_btn")||"Réponse reçue"}
-                </button>
-              </div>`;
-            })() : p.relanceReply ? `
+            ${p.relanceReply ? `
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <div style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;background:#064E3B22;color:#10B981;border:1px solid #10B98133">✅ ${t("relance_reply_received")||"Réponse reçue"} — ${fmtDate(p.relanceReply)}</div>
                 <button onclick="event.stopPropagation();resetProjDate(${p.id},'relanceReply')"
                   style="background:transparent;border:1px solid #2A2750;color:#5B5880;cursor:pointer;font-size:10px;padding:2px 7px;border-radius:4px">
                   ↩ ${t("relance_reset")||"Réinitialiser"}
                 </button>
-              </div>` : `<div style="font-size:11px;color:#4B4870;font-style:italic">${t('relance_hint')||'Renseigne le dernier contact'}</div>`}
+              </div>` : p.lastContact ? `
+              <button onclick="event.stopPropagation();openRelanceReplyModal('album',${p.id})"
+                style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#10B981;cursor:pointer;font-size:10px;padding:3px 9px;border-radius:5px;font-weight:600">
+                ✅ ${t("relance_reply_btn")||"Réponse reçue"}
+              </button>` : `<div style="font-size:11px;color:#4B4870;font-style:italic">${t('relance_hint')||'Renseigne le dernier contact'}</div>`}
           </div>
+          ${relanceHistoryHtml(p.relanceHistory)}
           </div>
 
         <button class="btn btn-sm btn-danger" style="margin-top:8px" onclick="deleteProject(${p.id})">${t("proj_delete")}</button>
@@ -5988,8 +7005,9 @@ function buildTrackRow(p, trk, i) {
       </button>
     </div>`;
 
+  const isLiveNow = isLiveLogicTrack(p.id, trk.id);
   return `<div>
-    <div class="track-row" onclick="if(event.target.tagName==='SELECT'||event.target.tagName==='INPUT'||event.target.tagName==='TEXTAREA'||event.target.closest('.date-select-group')||event.target.closest('.track-expand-body'))return;toggleTrack(${p.id},${trk.id})" style="position:relative;overflow:hidden">
+    <div class="track-row${isLiveNow?" live-logic-highlight":""}" onclick="if(event.target.tagName==='SELECT'||event.target.tagName==='INPUT'||event.target.tagName==='TEXTAREA'||event.target.closest('.date-select-group')||event.target.closest('.track-expand-body'))return;toggleTrack(${p.id},${trk.id})" style="position:relative;overflow:hidden">
       <div style="position:absolute;left:0;top:0;bottom:0;width:${Math.round(cfg.step/7*100)}%;background:${cfg.color};opacity:0.07;pointer-events:none"></div>
       <div class="track-dot" style="background:${cfg.dot}"></div>
       <div class="track-name">
@@ -5999,6 +7017,7 @@ function buildTrackRow(p, trk, i) {
           ${trk.originAlbum?` <span style="font-size:9px;color:#5B5880;font-style:italic">(${t("origin_album").replace("{album}",trk.originAlbum)})</span>`:""}
         </div>
       </div>
+      ${isLiveNow?`<span class="track-meta" style="color:#34D399;display:inline-flex;align-items:center;gap:5px;font-weight:700" title="${t('logic_live_badge')}"><span class="live-logic-dot"></span>${t('logic_live_badge')}</span>`:""}
       ${trk.bpm?`<span class="track-meta">${trk.bpm} BPM</span>`:""}
       ${trk.key?`<span class="track-meta">${trk.key}</span>`:""}
       ${trk.duration?`<span class="track-meta">${trk.duration}</span>`:""}
@@ -6154,6 +7173,7 @@ function buildTrackRow(p, trk, i) {
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               Email de relance
             </button>
+            ${relanceHistoryHtml(trk.relanceHistory)}
           </div>
         </div>
       </div>
@@ -6667,6 +7687,13 @@ function _doSendRelanceEmail(pid, tid, toEmail) {
       const a = document.createElement("a"); a.href = mailto; a.click();
     }
   }
+
+  // Enregistre cette relance dans l'historique de la track (Relance 1, Relance 2...)
+  if(!trk.relanceHistory) trk.relanceHistory = [];
+  trk.relanceHistory.push(new Date().toISOString());
+  trk.lastRelance = new Date().toISOString().slice(0,10);
+  save();
+  if(currentPage==="dashboard") renderDashboard(); else renderProjects();
 }
 
 function toggleTrackMood(pid, tid, mood, chipId) {
@@ -6852,9 +7879,22 @@ function renderProjects() {
     pubSelect.innerHTML = `<option value="">Tous les éditeurs</option>` +
       pubs.map(pub=>`<option value="${pub}" ${pub===currentPub?'selected':''}>${pub}</option>`).join('');
   }
+  // Peupler le filtre année, à partir des deadlines réellement présentes dans le catalogue
+  const yearSelect = document.getElementById('proj-year-filter');
+  if(yearSelect && yearSelect.options.length <= 1) {
+    const years = [...new Set(S.projects.filter(p=>p.deadline).map(p=>{
+      const d = new Date(p.deadline); return isNaN(d.getTime()) ? null : d.getFullYear();
+    }).filter(y=>y!=null))].sort((a,b)=>b-a);
+    years.forEach(y=>{
+      const opt = document.createElement("option");
+      opt.value = y; opt.textContent = y;
+      yearSelect.appendChild(opt);
+    });
+  }
   const filter=document.getElementById("proj-filter")?.value||"all";
   const sort=document.getElementById("proj-sort")?.value||"default";
   const pubFilter=document.getElementById("proj-pub-filter")?.value||"";
+  const yearFilter=document.getElementById("proj-year-filter")?.value||"";
   let projs;
   if(filter==="available") {
     projs=S.projects.filter(p=>!p.archived&&p.tracks.some(t=>t.status==="refused"&&t.available));
@@ -6867,6 +7907,12 @@ function renderProjects() {
   }
   // Filtre éditeur
   if(pubFilter) projs=projs.filter(p=>p.editeur===pubFilter);
+  // Filtre année (basé sur la deadline de l'album)
+  if(yearFilter) projs=projs.filter(p=>{
+    if(!p.deadline) return false;
+    const d = new Date(p.deadline);
+    return !isNaN(d.getTime()) && String(d.getFullYear())===String(yearFilter);
+  });
   // Sort
   if(sort==="deadline_asc") projs=[...projs].sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
   else if(sort==="deadline_desc") projs=[...projs].sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
@@ -6990,7 +8036,8 @@ function renderKanban() {
 
     tracks.forEach(t => {
       const card = document.createElement("div");
-      card.className = "kanban-card";
+      const isLiveNow = isLiveLogicTrack(t.projectId, t.id);
+      card.className = "kanban-card" + (isLiveNow ? " live-logic-highlight" : "");
       card.draggable = true;
       card.style.borderLeft = `3px solid ${cfg.color}66`;
 
@@ -7605,6 +8652,66 @@ function buildChartBars(barsId, tooltipId, year, tracks, curM) {
 // ══════════════════════════════════════════════════════════
 // ÉDITEURS
 // ══════════════════════════════════════════════════════════
+function getPublisherTracksByName(pubName) {
+  const tracks = [];
+  S.projects.forEach(p => {
+    const name = (p.editeur || t("pub_no_publisher")).trim();
+    if (name === pubName) {
+      p.tracks.forEach(tr => tracks.push({...tr, project:p}));
+    }
+  });
+  return tracks;
+}
+
+function computeSacemStatsForPublisher(tracks) {
+  const entries = S.sacemEntries || [];
+  const activeEntries = entries.filter(e => !sacemExcludedImportIds.has(e.importId) && !e.ignored);
+  const trackKeys = new Set(tracks.map(t => t.project.id + "-" + t.id));
+  const matched = activeEntries.filter(e => e.matchedTrackId && trackKeys.has(e.matchedProjectId + "-" + e.matchedTrackId));
+  const totalRevenue = matched.reduce((s,e) => s + (e.montantNet||0), 0);
+  const revenueByTrack = {};
+  const yearsByTrack = {};
+  matched.forEach(e => {
+    const key = e.matchedProjectId + "-" + e.matchedTrackId;
+    revenueByTrack[key] = (revenueByTrack[key]||0) + (e.montantNet||0);
+    if (e.year) { if (!yearsByTrack[key]) yearsByTrack[key] = new Set(); yearsByTrack[key].add(e.year); }
+  });
+  const nbTracksWithRevenue = Object.keys(revenueByTrack).length;
+  const avgPerTrack = nbTracksWithRevenue ? totalRevenue / nbTracksWithRevenue : 0;
+  const roiVals = [];
+  tracks.forEach(t => {
+    const key = t.project.id + "-" + t.id;
+    const revenue = revenueByTrack[key];
+    if (revenue && t.logicTimeSpent) {
+      const years = yearsByTrack[key] ? yearsByTrack[key].size : 1;
+      const annualRevenue = revenue / years;
+      roiVals.push(annualRevenue / (t.logicTimeSpent/3600));
+    }
+  });
+  const avgRoi = roiVals.length ? roiVals.reduce((a,b)=>a+b,0)/roiVals.length : null;
+  return { totalRevenue, nbTracksWithRevenue, totalTracks: tracks.length, avgPerTrack, avgRoi };
+}
+
+async function analyzePublisherSacemWithAI(pubName, i) {
+  const box = document.getElementById(`pub-sacem-ai-${i}`);
+  if (!box) return;
+  box.style.color = "#9D99C8";
+  box.innerHTML = escapeHtml(t("pub_sacem_ai_loading")||"Analyse en cours…");
+  try {
+    const tracks = getPublisherTracksByName(pubName);
+    const stats = computeSacemStatsForPublisher(tracks);
+    const prompt = currentLang==="fr"
+      ? `Analyse la performance SACEM de l'éditeur "${pubName}" : revenu net total ${stats.totalRevenue.toFixed(2)} €, sur ${stats.nbTracksWithRevenue}/${stats.totalTracks} tracks ayant généré du revenu, moyenne de ${stats.avgPerTrack.toFixed(2)} €/track (avec revenu)${stats.avgRoi!==null?`, rentabilité moyenne de ${stats.avgRoi.toFixed(2)} €/h/an sur les tracks avec du temps Logic Pro renseigné`:""}. Attention : le total dépend fortement du nombre de tracks placées chez cet éditeur, donc compare bien la moyenne par track et la rentabilité plutôt que le total brut par rapport à mes autres éditeurs. Donne-moi une analyse courte et concrète de la performance de cet éditeur.`
+      : `Analyze the SACEM performance of publisher "${pubName}": total net revenue €${stats.totalRevenue.toFixed(2)}, across ${stats.nbTracksWithRevenue}/${stats.totalTracks} tracks that generated revenue, average of €${stats.avgPerTrack.toFixed(2)}/track (with revenue)${stats.avgRoi!==null?`, average profitability of €${stats.avgRoi.toFixed(2)}/h/year on tracks with Logic Pro time tracked`:""}. Caution: the total is strongly affected by how many tracks are placed with this publisher, so compare average per track and profitability rather than raw total against my other publishers. Give me a short, concrete analysis of this publisher's performance.`;
+    const reply = await callAI(prompt);
+    box.style.color = "#C4C0E8";
+    box.innerHTML = reply.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br>");
+  } catch (err) {
+    box.style.color = "#F87171";
+    box.innerHTML = ICON_CROSS + escapeHtml(err.message);
+  }
+}
+
 function renderPublishers() {
   const box = document.getElementById("publishers-list");
   if(!box) return;
@@ -7725,11 +8832,7 @@ function renderPublishers() {
       </div>
       ${publishers.sort((a,b)=>b.rate-a.rate).map((pub,i) => {
         const col = colors[i%colors.length];
-        const relanceProjs = pub.projects.filter(p => {
-          if(!p.lastContact||p.status!=="sent") return false;
-          const d = Math.floor((new Date()-new Date(p.lastContact))/86400000);
-          return d >= (p.relanceDelay||15);
-        });
+        const relanceProjs = pub.projects.filter(albumHasOverdueTrack);
 
         // Calcul alerte relance tracks — basé sur delivered sans réponse
         // Si album validé/terminé/archivé ou track validée/livrée = pas d'alerte
@@ -7942,10 +9045,42 @@ function renderPublishers() {
                 }
               })()}
             </div>
+            <!-- Revenus SACEM par éditeur -->
+            ${(() => {
+              const sacemStats = computeSacemStatsForPublisher(pub.tracks);
+              if (!sacemStats.nbTracksWithRevenue) return "";
+              return `<div style="background:#1A1838;border:1px solid #2A2750;border-radius:10px;padding:16px;margin-bottom:14px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+                  <div style="font-size:11px;color:#9D99C8;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;flex:1">${t("pub_sacem_title")}</div>
+                  <button onclick="event.stopPropagation();analyzePublisherSacemWithAI('${pub.name.replace(/'/g,"\\'")}',${i})"
+                    style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#A78BFA;cursor:pointer;font-size:10px;padding:4px 10px;border-radius:5px;font-weight:600">
+                    ${t("pub_sacem_ai_btn")}
+                  </button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+                  <div class="stat-tooltip-wrap" style="text-align:center" title="${t('pub_sacem_total_tooltip')}">
+                    <div style="font-size:16px;font-weight:900;color:#10B981">${sacemStats.totalRevenue.toFixed(2)} €</div>
+                    <div style="font-size:9px;color:#4B4870">${t("pub_sacem_total")}</div>
+                  </div>
+                  <div class="stat-tooltip-wrap" style="text-align:center" title="${t('pub_sacem_avg_tooltip')}">
+                    <div style="font-size:16px;font-weight:900;color:#A78BFA">${sacemStats.avgPerTrack.toFixed(2)} €</div>
+                    <div style="font-size:9px;color:#4B4870">${t("pub_sacem_avg_per_track")}</div>
+                  </div>
+                  <div class="stat-tooltip-wrap" style="text-align:center" title="${t('pub_sacem_roi_tooltip')}">
+                    <div style="font-size:16px;font-weight:900;color:${sacemStats.avgRoi!==null?"#FBBF24":"#5B5880"}">${sacemStats.avgRoi!==null?sacemStats.avgRoi.toFixed(2)+" €/h/an":"—"}</div>
+                    <div style="font-size:9px;color:#4B4870">${t("pub_sacem_roi")}</div>
+                  </div>
+                </div>
+                <div style="font-size:10px;color:#5B5880;line-height:1.5;margin-bottom:8px">
+                  ${ICON_WARN_SM}${t("pub_sacem_caution")} (${sacemStats.nbTracksWithRevenue}/${sacemStats.totalTracks} ${t("pub_sacem_tracks_with_revenue")})
+                </div>
+                <div id="pub-sacem-ai-${i}" style="font-size:12px;color:#C4C0E8;line-height:1.6"></div>
+              </div>`;
+            })()}
             <!-- Albums de cet éditeur -->
             ${pub.projects.map(p => {
               const pPct = p.tracks.length ? Math.round(p.tracks.filter(t=>doneStatuses.includes(t.status)).length/p.tracks.length*100) : 0;
-              const relance = p.lastContact && p.status==="sent" && Math.floor((new Date()-new Date(p.lastContact))/86400000) >= (p.relanceDelay||15);
+              const relance = albumHasOverdueTrack(p);
               const prodYears = [...new Set(p.tracks.filter(t=>t.created).map(t=>new Date(t.created).getFullYear()))].sort();
               const yearLabel = prodYears.length ? (prodYears.length>1 ? `${prodYears[0]}–${prodYears[prodYears.length-1]}` : `${prodYears[0]}`) : (p.deadline ? new Date(p.deadline).getFullYear() : "");
               return `<div style="background:#1A1838;border:1px solid #2A2750;border-radius:8px;padding:10px 12px;margin-top:8px">
@@ -8769,14 +9904,26 @@ function setGoal(year,field,val){
 // ══════════════════════════════════════════════════════════
 // DASHBOARD GOALS WIDGET
 // ══════════════════════════════════════════════════════════
+// Objectif de l'année en cours — source unique partagée entre le widget
+// Dashboard, la page Objectifs et le briefing du jour, pour ne jamais avoir
+// deux totaux différents affichés pour le même objectif.
+function getCurrentYearGoals() {
+  const year = new Date().getFullYear();
+  if (!S.goalsByYear) S.goalsByYear = {};
+  if (!S.goalsByYear[year]) S.goalsByYear[year] = {produce:120,deliver:100,validate:70,locked:false};
+  return { year, g: S.goalsByYear[year] };
+}
+
 function renderDashGoals() {
   const box = document.getElementById("dash-goals-widget");
   if(!box) return;
-  const tracks = allTracks();
-  if(!S.goals) S.goals = {produce:120,deliver:100,validate:70};
-  const g = S.goals;
+  const { year, g } = getCurrentYearGoals();
+  // Un objectif annuel se compare à la production DE CETTE ANNÉE, pas au
+  // total de toutes les tracks jamais créées — sinon le compteur dépasse
+  // l'objectif dès la 2e année d'utilisation, même à un bon rythme.
+  const tracks = allTracks().filter(t=>t.created && new Date(t.created).getFullYear()===year);
   const produced = tracks.length;
-  const delivered = tracks.filter(t=>["delivered","validated"].includes(t.status)).length;
+  const delivered = tracks.filter(t=>t.status==="delivered").length;
   const validated = tracks.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
 
   const goalRow = (icon, label, current, target, color, field) => {
@@ -8811,8 +9958,11 @@ function renderDashGoals() {
 }
 
 function setDashGoal(field, val) {
+  const { year, g } = getCurrentYearGoals();
+  if (g.locked) return;
+  g[field] = parseInt(val)||1;
   if(!S.goals) S.goals = {};
-  S.goals[field] = parseInt(val)||1;
+  S.goals[field] = g[field]; // miroir legacy, gardé pour compat avec l'ancien stockage
   save();
   renderDashGoals();
   // Also refresh goals page if open
@@ -9116,10 +10266,15 @@ function openBriefing() {
   const urgent7 = S.projects.filter(p=>daysUntil(p.deadline)<=7&&daysUntil(p.deadline)>1&&p.status!=="accepted");
   const urgent30 = S.projects.filter(p=>daysUntil(p.deadline)<=30&&daysUntil(p.deadline)>7&&p.status!=="accepted");
 
-  // Objectifs
-  const g = S.goals||{produce:120,deliver:100,validate:70};
-  const pProd = g.produce ? Math.round(total/g.produce*100) : 0;
-  const pVal = g.validate ? Math.round(accepted/g.validate*100) : 0;
+  // Objectifs — un objectif annuel se compare à la production DE L'ANNÉE EN
+  // COURS, pas au total de toutes les tracks jamais créées (sinon il paraît
+  // dépassé en permanence dès la 2e année d'utilisation).
+  const { year: goalYear, g } = getCurrentYearGoals();
+  const tracksThisYear = tracks.filter(t=>t.created && new Date(t.created).getFullYear()===goalYear);
+  const producedThisYear = tracksThisYear.length;
+  const acceptedThisYear = tracksThisYear.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
+  const pProd = g.produce ? Math.round(producedThisYear/g.produce*100) : 0;
+  const pVal = g.validate ? Math.round(acceptedThisYear/g.validate*100) : 0;
 
   // Construire le briefing
   let html = "";
@@ -9143,20 +10298,9 @@ function openBriefing() {
     return daysSince > 14;
   });
 
-  // Relances album en attente
-  const albumsToRelance = S.projects.filter(p => {
-    if(p.status === "accepted" || p.archived) return false;
-    if(!p.lastContact) return false;
-    const allDone = p.tracks.length>0 && p.tracks.every(t=>['validated','delivered','refused'].includes(t.status));
-    if(allDone) return false;
-    const days = Math.floor((now - new Date(p.lastContact)) / 86400000);
-    return days >= (p.relanceDelay || 15);
-  }).map(p => ({
-    ...p,
-    daysSince: Math.floor((now - new Date(p.lastContact)) / 86400000)
-  }));
-
-  // Relances tracks en attente — utilise delivered OU lastRelance
+  // Relances tracks en attente — utilise delivered OU lastRelance. Seule
+  // source de vérité pour les alertes de relance (plus de chronomètre
+  // "contact album" séparé qui pouvait raconter une autre histoire).
   const tracksToRelance = [];
   S.projects.filter(p=>p.status!=="accepted"&&!p.archived).forEach(p=>{
     p.tracks.forEach(trk=>{
@@ -9172,12 +10316,17 @@ function openBriefing() {
     });
   });
 
-  // Fusionner les relances album et track par album
-  const albumRelanceIds = new Set(albumsToRelance.map(p => String(p.id)));
-  // Tracks en alerte dont l'album est AUSSI en alerte → fusionner
-  const tracksInAlertedAlbums = tracksToRelance.filter(trk => albumRelanceIds.has(String(trk.pid)));
-  // Tracks en alerte dont l'album N'est PAS en alerte → afficher séparément
-  const tracksOnlyRelance = tracksToRelance.filter(trk => !albumRelanceIds.has(String(trk.pid)));
+  // Grouper les tracks en attente par album, pour l'affichage
+  const albumsToRelanceMap = {};
+  tracksToRelance.forEach(trk => {
+    if(!albumsToRelanceMap[trk.pid]) {
+      const p = S.projects.find(x => String(x.id) === String(trk.pid));
+      albumsToRelanceMap[trk.pid] = { id: trk.pid, title: p ? p.title : trk.projectTitle, editeur: p ? p.editeur : "" };
+    }
+  });
+  const albumsToRelance = Object.values(albumsToRelanceMap);
+  const tracksInAlertedAlbums = tracksToRelance;
+  const tracksOnlyRelance = [];
 
   // 🚨 Urgences
   if(urgent1.length) {
@@ -9207,7 +10356,7 @@ function openBriefing() {
               <strong>${p.title}</strong> <span style="color:#7B78A8;font-size:10px">${p.editeur||""}</span>
             </span>
             <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:11px;font-weight:700;color:#F87171">${p.daysSince}${t("briefing_days_no_reply")||"j"}</span>
+              <span style="font-size:10px;font-weight:700;color:#F87171">${albumTracks.length} ${albumTracks.length>1?(t('briefing_tracks_waiting_plural')||'tracks sans réponse'):(t('briefing_tracks_waiting')||'track sans réponse')}</span>
               <button onclick="sendAlbumRelanceEmail(${p.id})" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#A78BFA;cursor:pointer;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600" title="${t('relance_album_title')||'Email relance album'}">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               </button>
@@ -9223,17 +10372,7 @@ function openBriefing() {
             </div>`).join("")}
         </div>`;
       }).join("")}
-      ${tracksOnlyRelance.slice(0,5).map(trk=>{
-        const tColor = trk.daysSince >= 30 ? '#FCA5A5' : trk.daysSince >= 15 ? '#FDE68A' : '#BFDBFE';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
-          <span onclick="goToTrack(${trk.pid},${trk.id})" style="font-size:12px;color:${tColor};cursor:pointer;text-decoration:underline;text-underline-offset:2px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="${tColor}" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:4px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><strong>${trk.title}</strong> <span style="color:#5B5880;font-size:10px">${trk.projectTitle}</span></span>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:11px;font-weight:700;color:${tColor}">${trk.daysSince}${t("briefing_days_no_reply")||"j"}</span>
-            <button onclick="sendRelanceEmail(${trk.pid},${trk.id})" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#A78BFA;cursor:pointer;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></button>
-          </div>
-        </div>`;
-      }).join("")}
-      ${(albumsToRelance.length + tracksOnlyRelance.length) > 5 ? `<div style="font-size:11px;color:#5B5880;margin-top:4px">+${albumsToRelance.length + tracksOnlyRelance.length - 5} ${t("briefing_more")||"autres"}</div>` : ""}
+      ${albumsToRelance.length > 5 ? `<div style="font-size:11px;color:#5B5880;margin-top:4px">+${albumsToRelance.length - 5} ${t("briefing_more")||"autres"}</div>` : ""}
     </div>`;
   }
 
@@ -9258,7 +10397,7 @@ function openBriefing() {
       <div style="font-size:11px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" style="vertical-align:middle;margin-right:5px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="#A78BFA" stroke="none"/></svg>${t("goals_title")} ${now.getFullYear()}</div>
       <div style="margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;font-size:12px;color:#C4C0E8;margin-bottom:4px">
-          <span>${t("goals_produce")}</span><span style="font-weight:700;color:#A78BFA">${total} / ${g.produce} (${pProd}%)</span>
+          <span>${t("goals_produce")}</span><span style="font-weight:700;color:#A78BFA">${producedThisYear} / ${g.produce} (${pProd}%)</span>
         </div>
         <div style="height:5px;background:#2A2750;border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${Math.min(100,pProd)}%;background:#7C3AED;border-radius:3px"></div>
@@ -9266,7 +10405,7 @@ function openBriefing() {
       </div>
       <div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:#C4C0E8;margin-bottom:4px">
-          <span>${t("goals_validate")}</span><span style="font-weight:700;color:#10B981">${accepted} / ${g.validate} (${pVal}%)</span>
+          <span>${t("goals_validate")}</span><span style="font-weight:700;color:#10B981">${acceptedThisYear} / ${g.validate} (${pVal}%)</span>
         </div>
         <div style="height:5px;background:#2A2750;border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${Math.min(100,pVal)}%;background:#10B981;border-radius:3px"></div>
@@ -9303,6 +10442,16 @@ function openBriefing() {
       ? messages[Math.floor(Math.random()*messages.length)]
       : urgentMessages[Math.floor(Math.random()*urgentMessages.length)]}
   </div>`;
+
+  // Citation musicale du jour — vérifiée ou inventée (auteur "Anonyme" dans
+  // ce cas, jamais attribuée à une vraie personne) — toujours en lien avec
+  // la musique/composition, en plus du message d'encouragement ci-dessus.
+  const quotes = TRANSLATIONS[currentLang].briefing_quotes || [];
+  if (quotes.length) {
+    html += `<div style="text-align:center;font-size:11px;color:#5B5880;padding:8px 16px 0;line-height:1.5">
+      ${quotes[Math.floor(Math.random()*quotes.length)]}
+    </div>`;
+  }
 
   // Afficher
   document.getElementById("briefing-date").textContent =
@@ -9781,6 +10930,82 @@ function loadAISettings() {
   if(inp && aiSettings.key) inp.value = aiSettings.key;
 }
 
+// Résumé compact des revenus SACEM (Beta) et du croisement temps/revenu,
+// pour donner à l'assistant IA de quoi répondre à des questions comme
+// "quelles sont mes tracks les plus rentables" ou "quel mood rapporte le
+// plus" — recalculé indépendamment de renderSacemPage() (mêmes règles :
+// on respecte le filtre de répartition actif et on ignore les lignes
+// exclues manuellement), pour rester une fonction pure sans toucher au DOM.
+function buildSacemContextSummary() {
+  const entries = S.sacemEntries || [];
+  if (!entries.length) return "Aucun relevé SACEM importé pour l'instant.";
+
+  const activeEntries = entries.filter(e => !sacemExcludedImportIds.has(e.importId));
+  const matched = activeEntries.filter(e => e.matchedTrackId && !e.ignored);
+  const totalNet = activeEntries.filter(e => !e.ignored).reduce((s,e) => s + (e.montantNet||0), 0);
+
+  const byTrack = {};
+  const byTrackYears = {};
+  matched.forEach(e => {
+    const key = e.matchedProjectId + "-" + e.matchedTrackId;
+    if (!byTrack[key]) {
+      const proj = (S.projects||[]).find(p=>p.id===e.matchedProjectId);
+      const track = proj && proj.tracks.find(t=>t.id===e.matchedTrackId);
+      byTrack[key] = { title: track ? (track.title||"Sans titre") : "?", moods: (track&&track.moods)||[], total: 0 };
+    }
+    byTrack[key].total += (e.montantNet || 0);
+    if (e.year) {
+      if (!byTrackYears[key]) byTrackYears[key] = new Set();
+      byTrackYears[key].add(e.year);
+    }
+  });
+  const topRevenue = Object.values(byTrack).sort((a,b)=>b.total-a.total).slice(0,5);
+
+  // Même logique d'annualisation que la carte ROI de la page SACEM : revenu
+  // moyen par année où la track a généré des droits, rapporté au temps Logic
+  // Pro investi, pour ne pas avantager mécaniquement les tracks anciennes.
+  const roiMap = new Map();
+  allTracksFlat().forEach(x => {
+    if (!x.track.logicTimeSpent) return;
+    const key = x.project.id + "-" + x.track.id;
+    roiMap.set(key, { title: x.track.title||"Sans titre", seconds: x.track.logicTimeSpent, revenue: 0, years: 0, moods: x.track.moods||[] });
+  });
+  Object.keys(byTrack).forEach(key => {
+    const yearsCount = byTrackYears[key] ? byTrackYears[key].size : 1;
+    const existing = roiMap.get(key);
+    if (existing) { existing.revenue = byTrack[key].total; existing.years = yearsCount; }
+    else roiMap.set(key, { title: byTrack[key].title, seconds: 0, revenue: byTrack[key].total, years: yearsCount, moods: byTrack[key].moods||[] });
+  });
+  const roiArr = Array.from(roiMap.values()).map(v => {
+    const annualRevenue = v.years > 0 ? v.revenue / v.years : v.revenue;
+    return { ...v, perHourPerYear: v.seconds > 0 ? annualRevenue / (v.seconds/3600) : null };
+  });
+  const roiWithTime = roiArr.filter(v => v.perHourPerYear !== null).sort((a,b) => b.perHourPerYear - a.perHourPerYear);
+
+  const moodGroups = {};
+  roiWithTime.forEach(v => {
+    const tags = (v.moods && v.moods.length) ? v.moods : ["Sans mood"];
+    tags.forEach(tag => {
+      if (!moodGroups[tag]) moodGroups[tag] = { label: tag, sum: 0, count: 0 };
+      moodGroups[tag].sum += v.perHourPerYear;
+      moodGroups[tag].count += 1;
+    });
+  });
+  const topMoods = Object.values(moodGroups).map(g => ({ ...g, avg: g.sum / g.count })).sort((a,b) => b.avg - a.avg).slice(0,5);
+
+  let out = `Total NET (répartitions incluses) : ${totalNet.toFixed(2)} €\n`;
+  out += topRevenue.length
+    ? `Top tracks par revenu cumulé :\n${topRevenue.map(x=>`- "${x.title}" : ${x.total.toFixed(2)} €`).join("\n")}\n`
+    : "Aucune ligne reliée à une track pour l'instant.\n";
+  out += roiWithTime.length
+    ? `Top tracks par rentabilité (€/h/an, revenu annuel moyen ÷ temps Logic Pro investi) :\n${roiWithTime.slice(0,5).map(v=>`- "${v.title}" : ${v.perHourPerYear.toFixed(2)} €/h/an`).join("\n")}\n`
+    : "Pas encore de track avec du temps Logic Pro ET des revenus SACEM pour calculer une rentabilité.\n";
+  out += topMoods.length
+    ? `Rentabilité moyenne par mood (€/h/an, chaque track peut apparaître dans plusieurs moods) :\n${topMoods.map(g=>`- ${g.label} : ${g.avg.toFixed(2)} €/h/an (${g.count} track${g.count>1?"s":""})`).join("\n")}`
+    : "";
+  return out;
+}
+
 function buildSyncContext() {
   const now = new Date();
   const tracks = allTracks();
@@ -9826,6 +11051,9 @@ ${S.projects.filter(p=>!p.archived&&p.status==="draft").slice(0,8).map(p=>{
 
 🏢 ÉDITEURS :
 ${[...new Set(S.projects.map(p=>p.editeur).filter(Boolean))].slice(0,10).join(", ")||"Aucun"}
+
+💰 REVENUS SACEM (Beta — module récent, données à prendre avec prudence) :
+${buildSacemContextSummary()}
 
 📦 ALBUMS ARCHIVÉS :
 ${S.projects.filter(p=>p.archived).slice(0,10).map(p=>{
@@ -10442,7 +11670,8 @@ const quickPrompts = {
   today: currentLang==="fr" ? "Qu'est-ce que je dois absolument faire aujourd'hui ? Analyse mes deadlines urgentes, mes tracks en retard et mes relances en attente. Donne-moi un planning heure par heure concret et réaliste pour aujourd'hui." : "What do I absolutely need to do today? Analyze my urgent deadlines, late tracks and pending follow-ups. Give me a concrete and realistic hour-by-hour schedule for today.",
   blocked: currentLang==="fr" ? "Quelles sont mes tracks bloquées ou en difficulté ? Utilise risk_analysis pour identifier les problèmes et propose des solutions concrètes pour débloquer chaque situation." : "Which of my tracks are blocked or in trouble? Use risk_analysis to identify the problems and suggest concrete solutions to unblock each situation.",
   memory: currentLang==="fr" ? "Montre-moi ce que tu as mémorisé sur moi et mes habitudes de travail. Si tu as des observations intéressantes, partage-les. Si tu remarques des patterns dans mes données, mémorise-les avec update_ai_memory." : "Show me what you've memorized about me and my work habits. If you have interesting observations, share them. If you notice patterns in my data, memorize them with update_ai_memory.",
-  predict: currentLang==="fr" ? "Utilise predict_deadline pour analyser mon album le plus urgent et dis-moi si je vais tenir la deadline. Sois précis et honnête." : "Use predict_deadline to analyze my most urgent album and tell me if I'll make the deadline. Be precise and honest."
+  predict: currentLang==="fr" ? "Utilise predict_deadline pour analyser mon album le plus urgent et dis-moi si je vais tenir la deadline. Sois précis et honnête." : "Use predict_deadline to analyze my most urgent album and tell me if I'll make the deadline. Be precise and honest.",
+  profitability: currentLang==="fr" ? "Analyse mes revenus SACEM : quelles sont mes tracks les plus rentables (revenu par heure investie), et quels moods rapportent le plus ? Rappelle que ces données SACEM sont en bêta." : "Analyze my SACEM revenue: which tracks are my most profitable (revenue per hour invested), and which moods pay off the most? Remind me that this SACEM data is in beta."
 };
 
 function quickAI(type) {
@@ -10584,10 +11813,13 @@ function _doSendAlbumRelanceEmail(pid, toEmail) {
     } else { const a=document.createElement("a"); a.href=mailto; a.click(); }
   }
 
-  // Mettre à jour la date de dernière relance album
+  // Mettre à jour la date de dernière relance album + historique des relances
   p.lastAlbumRelance = new Date().toISOString().slice(0,10);
+  if(!p.relanceHistory) p.relanceHistory = [];
+  p.relanceHistory.push(new Date().toISOString());
   save();
   showUndoToast(ICON_MAIL + (isEN ? `Album follow-up sent to ${escapeHtml(p.editeur)}` : `Relance album envoyée à ${escapeHtml(p.editeur)}`), true);
+  if(currentPage==="dashboard") renderDashboard(); else renderProjects();
 }
 
 function resetEmailTemplate() {
@@ -10864,6 +12096,7 @@ function openHelp() {
         '<b>Duplicate titles</b> — flags catalog tracks that share a name AND appear in an imported SACEM statement, so you can rename them (e.g. add the album) before revenue gets misattributed.',
         '<b>Breakdown filter</b> — with several imports, check/uncheck each statement to include or exclude it from the totals shown.',
         '<b>Time vs revenue (€/h/yr)</b> — crosses Logic Pro time spent with the average yearly SACEM revenue per track, annualized so older tracks (which mechanically accrued more years of royalties) don\'t get an unfair edge.',
+        '<b>Profitability by mood</b> — averages €/h/yr per exact mood combination (e.g. "Dark + Fantasy" vs "Dark + Neo-Classic" count as separate groups) to spot which styles pay off best relative to time invested.',
         '<b>Beta</b> — this module is new: matching accuracy and calculations will keep improving with future updates. Always double-check figures before relying on them for anything important.'
       ]
     },
@@ -10875,6 +12108,7 @@ function openHelp() {
         '<b>Automatic detection</b> — opening a Logic Pro project shows a banner offering three choices: create a new track, add it to an existing album, or link it to a track already in your catalog (title-based suggestion, but always requires your confirmation — never applied silently).',
         '<b>Time tracking</b> — once a track is linked to a Logic Pro project, time spent working on it (Logic in the foreground, no system idle) is logged automatically. See it on the track, or grouped by track/album/publisher in Statistics → Logic time.',
         '<b>Link a track manually</b> — on any track never linked to Logic Pro (Kanban card or Projects/Albums sheet), a "Link to a Logic Pro project…" button lets you connect it yourself.',
+        '<b>Manual time entry</b> — the "Manual time" link next to any track\'s Logic status lets you set an approximate time in hours/minutes, mainly useful for tracks composed before automatic tracking existed. It\'s flagged as an estimate until real Logic Pro ticks start accumulating on top of it.',
         '<b>Broken link repair</b> — if a Logic Pro project is renamed or moved, the link is flagged broken; use "Relink…" to point it to its new location.',
         '<b>Collision protection</b> — a single Logic Pro project can never end up linked to two different tracks at once.'
       ]
@@ -10952,7 +12186,7 @@ function openHelp() {
       color: '#A78BFA',
       title: 'AI Assistant (Beta)',
       items: [
-        '<b>12 quick prompts</b> — Urgent deadlines · Analyze my stats · Today\'s advice · Tracks to recycle · Sync Watch · Trending Moods · Risk Analysis · Weekly Report · What to do today · Blocked Tracks · My Memory · Predict my deadline.',
+        '<b>13 quick prompts</b> — Urgent deadlines · Analyze my stats · Today\'s advice · Tracks to recycle · Sync Watch · Trending Moods · Risk Analysis · Weekly Report · What to do today · Blocked Tracks · My Memory · Predict my deadline · My most profitable tracks (SACEM, Beta).',
         '<b>Free input</b> — type any question about your projects, tracks or publishers.',
         '<b>Beta</b> — the AI works from your actual data but may contain inaccuracies. Always verify critical information.'
       ]
@@ -11022,6 +12256,7 @@ function openHelp() {
         '<b>Titres en double</b> — signale les tracks de ton catalogue qui partagent un nom ET apparaissent dans un relevé SACEM importé, pour que tu puisses les renommer (ex : ajouter l\'album) avant toute erreur d\'attribution.',
         '<b>Filtre de répartition</b> — avec plusieurs imports, coche/décoche chaque relevé pour l\'inclure ou non dans les totaux affichés.',
         '<b>Temps vs revenu (€/h/an)</b> — croise le temps passé sur Logic Pro et le revenu SACEM annuel moyen par track, annualisé pour ne pas avantager les tracks anciennes (qui ont mécaniquement plus d\'années de droits accumulés).',
+        '<b>Rentabilité par mood</b> — moyenne du €/h/an par combinaison exacte de moods (ex : "Dark + Fantasy" et "Dark + Neo-Classic" comptent comme deux groupes distincts) pour repérer quels styles rapportent le plus par rapport au temps investi.',
         '<b>Beta</b> — ce module est récent : la précision du matching et les calculs vont continuer à s\'améliorer au fil des prochaines mises à jour. Vérifie toujours les chiffres avant de t\'y fier pour quelque chose d\'important.'
       ]
     },
@@ -11033,6 +12268,7 @@ function openHelp() {
         '<b>Détection automatique</b> — ouvrir un projet Logic Pro affiche un bandeau proposant trois choix : créer une nouvelle track, l\'ajouter à un album existant, ou la lier à une track déjà présente dans ton catalogue (suggestion basée sur le titre, mais toujours à confirmer — jamais appliquée silencieusement).',
         '<b>Suivi du temps</b> — une fois une track liée à un projet Logic Pro, le temps passé dessus (Logic au premier plan, sans inactivité système) est comptabilisé automatiquement. Visible sur la track, ou regroupé par track/album/éditeur dans Statistiques → Temps Logic.',
         '<b>Lier une track manuellement</b> — sur toute track jamais liée à Logic Pro (carte Kanban ou fiche Projets/Albums), un bouton "Lier à un projet Logic Pro…" permet de la connecter toi-même.',
+        '<b>Saisie manuelle du temps</b> — le lien "Temps manuel" à côté du statut Logic de chaque track permet de renseigner une estimation en heures/minutes, surtout utile pour les tracks composées avant l\'existence du suivi automatique. C\'est marqué comme une estimation tant qu\'aucun vrai tick Logic Pro ne vient s\'y ajouter.',
         '<b>Réparer un lien cassé</b> — si un projet Logic Pro est renommé ou déplacé, le lien est signalé cassé ; utilise "Relier…" pour le repointer vers son nouvel emplacement.',
         '<b>Protection anti-collision</b> — un même projet Logic Pro ne peut jamais se retrouver lié à deux tracks différentes en même temps.'
       ]
@@ -11110,7 +12346,7 @@ function openHelp() {
       color: '#A78BFA',
       title: 'Assistant IA (Beta)',
       items: [
-        '<b>12 prompts rapides</b> — Mes deadlines urgentes · Analyse mes stats · Conseils du jour · Tracks à recycler · Veille Sync · Moods tendance · Analyse des risques · Rapport semaine · Que faire aujourd\'hui ? · Tracks bloquées · Ma mémoire · Prédire ma deadline.',
+        '<b>13 prompts rapides</b> — Mes deadlines urgentes · Analyse mes stats · Conseils du jour · Tracks à recycler · Veille Sync · Moods tendance · Analyse des risques · Rapport semaine · Que faire aujourd\'hui ? · Tracks bloquées · Ma mémoire · Prédire ma deadline · Mes tracks les plus rentables (SACEM, Beta).',
         '<b>Saisie libre</b> — tape n\'importe quelle question sur tes projets, tracks ou éditeurs.',
         '<b>Beta</b> — l\'IA travaille depuis tes vraies données mais peut contenir des imprécisions. Vérifie toujours les informations critiques.'
       ]

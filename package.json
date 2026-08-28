@@ -1,6 +1,6 @@
 {
   "name": "sync-planner",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "SYNC.PLANNER — Composer Manager",
   "main": "main.js",
   "scripts": {
