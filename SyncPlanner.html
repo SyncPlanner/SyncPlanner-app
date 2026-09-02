@@ -9,6 +9,12 @@
 html,body{height:100%;background:#0F0E1A;color:#E2E0F0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px}
 body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:160px 160px}
 input,textarea,select,button{font-family:inherit}
+/* Empêche un ancêtre draggable=true (carte album, carte Kanban...) de
+   capter le clic-glisse quand on essaie de sélectionner du texte dans un
+   champ — sans ça, la sélection déclenche un déplacement de la carte au
+   lieu de sélectionner le texte, partout où un champ se trouve à
+   l'intérieur d'un élément déplaçable. */
+input,textarea{-webkit-user-drag:none}
 button{cursor:pointer}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#3D3A60;border-radius:3px}
@@ -207,8 +213,8 @@ button{cursor:pointer}
 .live-logic-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#34D399;animation:liveLogicPulse 1.6s infinite;flex-shrink:0}
 .live-logic-highlight{box-shadow:0 0 0 1px rgba(52,211,153,0.7),0 0 14px rgba(52,211,153,0.3) !important}
 .kanban-card.dragging{opacity:0.4}
-.kanban-card-title{font-size:11px;font-weight:600;color:#E2E0F0;margin-bottom:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.kanban-card-proj{font-size:9px;color:#5B5880;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kanban-card-title{font-size:11px;font-weight:600;color:#E2E0F0;margin-bottom:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;user-select:text;-webkit-user-drag:none;cursor:text}
+.kanban-card-proj{font-size:9px;color:#5B5880;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:text;-webkit-user-drag:none;cursor:text}
 .kanban-card-meta{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .kanban-drop-target{border:2px dashed #7C3AED44;border-radius:7px;min-height:40px;background:#1A1650;transition:background 0.15s}
 .kanban-drop-target.drag-over{background:#2A1F5C;border-color:#7C3AED}
@@ -771,10 +777,15 @@ select.inp option{background:#1A1838}
         <div id="sacem-album-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px">
             <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em" id="ui-sacem-album-title">Rentabilité par album</div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7B78A8;cursor:pointer;white-space:nowrap">
-              <input type="checkbox" id="sacem-hide-no-revenue" onchange="toggleSacemHideNoRevenue(this.checked)">
-              <span id="ui-sacem-hide-no-revenue">Masquer les albums sans revenu</span>
-            </label>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <select id="sacem-album-year-filter" onchange="renderSacemPage()" class="btn" style="padding:4px 8px;font-size:11px">
+                <option value="" id="ui-sacem-album-year-all">Toutes les années</option>
+              </select>
+              <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7B78A8;cursor:pointer;white-space:nowrap">
+                <input type="checkbox" id="sacem-hide-no-revenue" onchange="toggleSacemHideNoRevenue(this.checked)">
+                <span id="ui-sacem-hide-no-revenue">Masquer les albums sans revenu</span>
+              </label>
+            </div>
           </div>
           <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-album-desc">Revenu SACEM et temps Logic Pro cumulés par album, tous les tracks confondus. Clique sur un album pour voir le détail par track et par année.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
@@ -790,6 +801,7 @@ select.inp option{background:#1A1838}
         <div id="sacem-evolution-card" style="display:none;background:#1A1838;border:1px solid #2A2750;border-radius:12px;padding:20px;margin-bottom:20px">
           <div style="font-size:13px;font-weight:700;color:#A78BFA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px" id="ui-sacem-evolution-title">Évolution du catalogue</div>
           <div style="font-size:11px;color:#5B5880;margin-bottom:14px" id="ui-sacem-evolution-desc">Total NET perçu par trimestre (regroupé par année quand le trimestre exact n'est pas identifiable dans le relevé), tous imports actifs confondus — indépendant du matching par track.</div>
+          <div id="sacem-evolution-chart" style="margin-bottom:18px"></div>
           <div id="sacem-evolution-list"></div>
           <div style="font-size:10px;color:#5B5880;margin-top:12px" id="ui-sacem-evolution-lag-notice">Les versements SACEM reflètent des diffusions d'il y a 12 à 24 mois (parfois plus à l'international) — une hausse ou baisse ici correspond à une période antérieure, pas à l'activité actuelle.</div>
         </div>
@@ -1001,7 +1013,7 @@ select.inp option{background:#1A1838}
         </div>
         <!-- Input -->
         <div style="border-top:1px solid #2A2750;padding:12px;display:flex;gap:8px">
-          <input class="inp" id="ai-input" placeholder="Ex: Quelles sont mes deadlines urgentes ? Analyse mes stats..." 
+          <input class="inp" id="ai-input" placeholder="Ex: Quelles sont mes deadlines urgentes ? Analyse mes stats..."
             style="flex:1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage()}">
           <button class="btn btn-primary" onclick="sendAIMessage()" id="ui-ai-send" style="flex-shrink:0">Envoyer</button>
           <button onclick="resetAIConversation()" title="Nouvelle conversation" style="background:transparent;border:1px solid #2A2750;color:#5B5880;cursor:pointer;padding:8px 10px;border-radius:8px;font-size:16px;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
@@ -1512,6 +1524,10 @@ select.inp option{background:#1A1838}
         </select>
       </div>
       <div><label class="lbl" id="ui-modal-deadline">Deadline *</label><div id="m-deadline-wrap"></div><input type="hidden" id="m-deadline"></div>
+      <div><label class="lbl" id="ui-modal-created">Année de production</label>
+        <select class="inp" id="m-created-year"><option value="" id="ui-modal-created-default">Aujourd'hui</option></select>
+        <div style="font-size:10px;color:#5B5880;margin-top:3px" id="ui-modal-created-hint">Utilisée pour les statistiques annuelles — pas la deadline.</div>
+      </div>
       <div><label class="lbl" id="ui-modal-publisher">Éditeur / Client</label><input class="inp" id="m-editeur" placeholder="Sony Music, Canal+…"></div>
       <div><label class="lbl" id="ui-modal-genre">Genre</label><input class="inp" id="m-genre" placeholder="Cinematic, Ambient…"></div>
       <div class="form-full"><label class="lbl" id="ui-modal-desc">Description</label><textarea class="inp" id="m-desc" rows="2" placeholder="Notes sur le projet…" style="resize:vertical"></textarea></div>
@@ -1643,6 +1659,7 @@ const TRANSLATIONS = {
     sacem_no_editeur:"Sans éditeur",
     sacem_album_title:"Rentabilité par album", sacem_album_desc:"Revenu SACEM et temps Logic Pro cumulés par album, tous les tracks confondus. Clique sur un album pour voir le détail par track et par année.",
     sacem_hide_no_revenue:"Masquer les albums sans revenu",
+    sacem_album_year_all:"Toutes les années",
     sacem_album_empty_filtered:"Tous les albums suivis sont masqués (aucun n'a encore de revenu SACEM) — décoche \"Masquer les albums sans revenu\" pour les voir.",
     sacem_album_empty:"Aucun album avec du temps ET des revenus pour calculer ça pour l'instant.",
     sacem_album_no_track_detail:"Aucune track reliée pour cet album pour l'instant.",
@@ -1736,11 +1753,19 @@ const TRANSLATIONS = {
     stat_inprod:"En production", stat_albums:"Albums terminés", stat_deadlines:"Deadlines proches",
     chart_monthly:"Production mensuelle", chart_produced:"Produites",
     chart_approved:"Validées", chart_rejected:"Refusées", chart_inprog:"En cours",
+    stats_col_month:"Mois", stats_col_prod:"Prod.", stats_col_valid:"Valid.", stats_col_refused:"Refus.", stats_total_label:"Total",
+    stats_evolution_label:"Évolution", stats_tracks_word:"Tracks",
     no_activity:"Aucune activité",
     // Projects
     filter_all:"Tous les statuts", filter_available:"Recyclables",
     no_projects:"Aucun projet — créez-en un !",
     proj_status:"Statut du projet", proj_deadline:"Deadline", proj_publisher:"Éditeur",
+    proj_created_bulk:"Année de production (toutes les tracks)",
+    proj_created_bulk_hint:"Sert pour les statistiques annuelles — indépendant de la deadline. Applique la même année à toutes les tracks de cet album.",
+    proj_created_bulk_done:"Année de production appliquée à toutes les tracks",
+    proj_created_spread:"↔ Répartir les dates jusqu'à la deadline",
+    proj_created_spread_hint:"Répartit uniformément les dates de création des tracks entre le 1er janvier et la deadline, pour un graphique de production mensuelle plus réaliste (approximation, pas les vraies dates).",
+    proj_created_spread_done:"Dates réparties jusqu'à la deadline (approximation)",
     proj_notes:"Notes", proj_delete:"Supprimer le projet", add_track:"+ Ajouter une track",
     // Collabs
     collabs_album:"Collaborateurs & Partage", collabs_track:"Collaborateurs sur cette track",
@@ -1839,6 +1864,7 @@ const TRANSLATIONS = {
     // New project modal
     modal_title:"Nouveau projet sync", modal_name:"Nom du projet / album *",
     modal_type:"Type", modal_deadline:"Deadline *", modal_publisher:"Éditeur / Client",
+    modal_created:"Année de production", modal_created_hint:"Utilisée pour les statistiques annuelles — pas la deadline.", modal_created_default:"Aujourd'hui",
     modal_genre:"Genre", modal_desc:"Description", modal_status:"Statut",
     modal_auto:"Création automatique des tracks",
     modal_count:"Nombre de tracks", modal_prefix:"Préfixe",
@@ -2247,6 +2273,7 @@ const TRANSLATIONS = {
     sacem_no_editeur:"No publisher",
     sacem_album_title:"Profitability by album", sacem_album_desc:"Cumulative SACEM revenue and Logic Pro time per album, across all its tracks. Click an album to see the per-track, per-year breakdown.",
     sacem_hide_no_revenue:"Hide albums with no revenue",
+    sacem_album_year_all:"All years",
     sacem_album_empty_filtered:"All tracked albums are hidden (none has SACEM revenue yet) — uncheck \"Hide albums with no revenue\" to see them.",
     sacem_album_empty:"No album with both time AND revenue to calculate this yet.",
     sacem_album_no_track_detail:"No track linked to this album yet.",
@@ -2333,10 +2360,18 @@ const TRANSLATIONS = {
     stat_inprod:"In Production", stat_albums:"Completed Albums", stat_deadlines:"Upcoming Deadlines",
     chart_monthly:"Monthly Production", chart_produced:"Produced",
     chart_approved:"Approved", chart_rejected:"Rejected", chart_inprog:"In Progress",
+    stats_col_month:"Month", stats_col_prod:"Prod.", stats_col_valid:"Valid.", stats_col_refused:"Rej.", stats_total_label:"Total",
+    stats_evolution_label:"Evolution", stats_tracks_word:"Tracks",
     no_activity:"No activity",
     filter_all:"All statuses", filter_available:"Recyclables",
     no_projects:"No projects yet — create one!",
     proj_status:"Project Status", proj_deadline:"Deadline", proj_publisher:"Publisher",
+    proj_created_bulk:"Production year (all tracks)",
+    proj_created_bulk_hint:"Used for yearly statistics — independent of the deadline. Applies the same year to every track in this album.",
+    proj_created_bulk_done:"Production year applied to all tracks",
+    proj_created_spread:"↔ Spread dates until the deadline",
+    proj_created_spread_hint:"Evenly spreads the tracks' creation dates between January 1st and the deadline, for a more realistic monthly production chart (an approximation, not the real dates).",
+    proj_created_spread_done:"Dates spread out until the deadline (approximation)",
     proj_notes:"Notes", proj_delete:"Delete Project", add_track:"+ Add a track",
     collabs_album:"Collaborators & Share", collabs_track:"Collaborators on this track",
     add_collab:"+ Collaborator", collab_name:"Name…",
@@ -2423,6 +2458,7 @@ const TRANSLATIONS = {
     import_restart:"← Start over",
     modal_title:"New Sync Project", modal_name:"Project / album name *",
     modal_type:"Type", modal_deadline:"Deadline *", modal_publisher:"Publisher / Client",
+    modal_created:"Production year", modal_created_hint:"Used for yearly statistics — not the deadline.", modal_created_default:"Today",
     modal_genre:"Genre", modal_desc:"Description", modal_status:"Status",
     modal_auto:"Auto-create tracks",
     modal_count:"Number of tracks", modal_prefix:"Prefix",
@@ -2822,6 +2858,9 @@ function updateUI() {
     "ui-modal-title":         t("modal_title"),
     "ui-modal-type":          t("modal_type"),
     "ui-modal-deadline":      t("modal_deadline"),
+    "ui-modal-created":       t("modal_created"),
+    "ui-modal-created-hint":  t("modal_created_hint"),
+    "ui-modal-created-default": t("modal_created_default"),
     "ui-modal-publisher":     t("modal_publisher"),
     "ui-modal-genre":         t("modal_genre"),
     "ui-modal-desc":          t("modal_desc"),
@@ -3045,6 +3084,7 @@ function updateUI() {
     "ui-sacem-album-title":      t("sacem_album_title"),
     "ui-sacem-album-desc":       t("sacem_album_desc"),
     "ui-sacem-hide-no-revenue":  t("sacem_hide_no_revenue"),
+    "ui-sacem-album-year-all":   t("sacem_album_year_all"),
     "ui-tab-logictime":          t("stats_tab_logictime"),
   };
   for(const [id, val] of Object.entries(els)) {
@@ -5288,6 +5328,40 @@ function sacemAmountColor(amount, maxAmount) {
   return "#7B78A8";                     // montant faible — gris neutre
 }
 
+// Graphique en barres de l'évolution du catalogue (un point par trimestre ou
+// année, selon ce qui est identifiable). SVG pur (pas de librairie externe) :
+// largeur fixe par barre + défilement horizontal si beaucoup de périodes,
+// mais s'étire pour remplir la carte quand il y en a peu (viewBox + width:100%).
+function buildSacemEvolutionChartSvg(periodArr, maxPeriodTotal) {
+  if (!periodArr.length || maxPeriodTotal <= 0) return '';
+  const barW = 34, gap = 16, chartH = 150, padTop = 10, padBottom = 34;
+  const totalW = periodArr.length * (barW + gap) + gap;
+  const svgH = chartH + padTop + padBottom;
+  const baseY = padTop + chartH;
+  const bars = periodArr.map((p, i) => {
+    const x = gap + i * (barW + gap);
+    const h = Math.max(3, Math.round((p.total / maxPeriodTotal) * chartH));
+    const y = baseY - h;
+    const color = sacemAmountColor(p.total, maxPeriodTotal);
+    const isLast = i === periodArr.length - 1;
+    const qLabel = p.quarter ? 'T' + p.quarter : String(p.year);
+    const showYear = p.quarter === 1 || !p.quarter;
+    return '<g>'
+      + '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" fill="' + color + '"' + (isLast ? '' : ' opacity="0.82"') + '>'
+      + '<title>' + (p.quarter ? p.year + ' · T' + p.quarter : p.year) + ' — ' + p.total.toFixed(2) + ' €</title>'
+      + '</rect>'
+      + '<text x="' + (x + barW/2) + '" y="' + (baseY + 15) + '" text-anchor="middle" font-size="9" fill="#7B78A8" font-family="inherit">' + qLabel + '</text>'
+      + (showYear ? '<text x="' + (x + barW/2) + '" y="' + (baseY + 27) + '" text-anchor="middle" font-size="8" fill="#3D3A60" font-family="inherit">' + p.year + '</text>' : '')
+      + '</g>';
+  }).join('');
+  return '<div style="overflow-x:auto;padding-bottom:4px">'
+    + '<svg width="' + totalW + '" height="' + svgH + '" viewBox="0 0 ' + totalW + ' ' + svgH + '" style="display:block;width:100%;min-width:' + totalW + 'px">'
+    + '<line x1="0" y1="' + baseY + '" x2="' + totalW + '" y2="' + baseY + '" stroke="#2A2750" stroke-width="1"/>'
+    + bars
+    + '</svg>'
+    + '</div>';
+}
+
 function bulkIgnoreSacemReview() {
   (S.sacemEntries || []).forEach(e => {
     if (sacemReviewSelected.has(e.id)) e.ignored = true;
@@ -5396,6 +5470,7 @@ function renderSacemPage() {
   const albumGlobalStats = document.getElementById("sacem-album-globalstats");
   const evolutionCard = document.getElementById("sacem-evolution-card");
   const evolutionList = document.getElementById("sacem-evolution-list");
+  const evolutionChart = document.getElementById("sacem-evolution-chart");
 
   // Avertissement doublons — affiché indépendamment de tout import, dès
   // qu'un titre est partagé par plusieurs tracks du catalogue.
@@ -5488,6 +5563,7 @@ function renderSacemPage() {
   } else {
     evolutionCard.style.display = "block";
     const maxPeriodTotal = Math.max(0, ...periodArr.map(p => p.total));
+    if (evolutionChart) evolutionChart.innerHTML = buildSacemEvolutionChartSvg(periodArr, maxPeriodTotal);
     const byKey = {};
     periodArr.forEach(p => { byKey[p.key] = p; });
     const evolutionRows = periodArr.map(p => {
@@ -5815,25 +5891,50 @@ function renderSacemPage() {
     const albumGroups = {};
     roiArr.forEach(v => {
       if (v.albumId == null) return;
-      if (!albumGroups[v.albumId]) albumGroups[v.albumId] = { albumId: v.albumId, album: v.album, cover: v.cover, revenue: 0, seconds: 0, annualRevenue: 0, secondsWithRevenue: 0 };
+      if (!albumGroups[v.albumId]) albumGroups[v.albumId] = { albumId: v.albumId, album: v.album, cover: v.cover, revenue: 0, seconds: 0, annualRevenue: 0, secondsWithRevenue: 0, byYear: {} };
       const g = albumGroups[v.albumId];
       g.revenue += v.revenue;
       g.seconds += v.seconds;
       if (v.seconds > 0 && v.revenue > 0) { g.annualRevenue += v.annualRevenue; g.secondsWithRevenue += v.seconds; }
     });
+    // Revenu par album ET par année — permet de filtrer la grille sur une
+    // année précise (ex. "2025") plutôt que le cumul tous exercices confondus.
+    matched.forEach(e => {
+      const aid = e.matchedProjectId;
+      if (aid == null || !albumGroups[aid]) return;
+      const y = e.year || "?";
+      albumGroups[aid].byYear[y] = (albumGroups[aid].byYear[y] || 0) + (e.montantNet || 0);
+    });
     let albumArr = Object.values(albumGroups).map(g => ({
       ...g,
       perHourPerYear: g.secondsWithRevenue > 0 ? g.annualRevenue / (g.secondsWithRevenue / 3600) : null,
-    })).sort((a,b) => b.revenue - a.revenue);
+    }));
+
+    // Filtre année — sélecteur sur la grille (indépendant du filtre année de
+    // la page Projets, spécifique à cette vue rentabilité).
+    const gridYearSelect = document.getElementById('sacem-album-year-filter');
+    if (gridYearSelect && gridYearSelect.options.length <= 1) {
+      const years = [...new Set(albumArr.flatMap(g => Object.keys(g.byYear)))].filter(y => y !== "?").sort((a,b) => b-a);
+      years.forEach(y => {
+        const opt = document.createElement("option");
+        opt.value = y; opt.textContent = y;
+        gridYearSelect.appendChild(opt);
+      });
+    }
+    const gridYearFilter = gridYearSelect ? gridYearSelect.value : "";
+    const gridRevenue = (g) => gridYearFilter ? (g.byYear[gridYearFilter] || 0) : g.revenue;
+    albumArr.forEach(g => { g.displayedRevenue = gridRevenue(g); });
+    albumArr.sort((a,b) => b.displayedRevenue - a.displayedRevenue);
 
     // Masque les albums sans aucun revenu SACEM perçu (typiquement des albums
-    // encore en cours de production) — n'a d'intérêt que sur cette vue
-    // rentabilité, donc ne touche à rien d'autre dans l'appli.
+    // encore en cours de production, ou sans revenu sur l'année filtrée) —
+    // n'a d'intérêt que sur cette vue rentabilité, donc ne touche à rien
+    // d'autre dans l'appli.
     const hideNoRevenue = (S.settings||{}).sacemHideNoRevenue !== false;
     const hideCheckbox = document.getElementById("sacem-hide-no-revenue");
     if (hideCheckbox) hideCheckbox.checked = hideNoRevenue;
     const albumArrAll = albumArr;
-    if (hideNoRevenue) albumArr = albumArr.filter(g => g.revenue > 0);
+    if (hideNoRevenue) albumArr = albumArr.filter(g => g.displayedRevenue > 0);
 
     // Panneau de stats globales — toujours affiché, indépendamment de
     // l'album sélectionné (contrairement au détail, ancré juste en dessous
@@ -5882,9 +5983,10 @@ function renderSacemPage() {
           + '<div style="padding:10px">'
           + '<div style="font-size:12px;color:#F0EEF8;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(g.album||"?") + '</div>'
           + '<div style="font-size:9px;color:#5B5880;margin-bottom:6px">' + (t("sacem_album_since")||"Depuis") + ' ' + albumSinceLabel(g.albumId) + '</div>'
-          + '<div style="font-size:11px;color:#10B981;font-weight:700">' + g.revenue.toFixed(2) + ' €</div>'
-          + '<div style="font-size:10px;color:#60A5FA">' + (g.seconds > 0 ? formatLogicDuration(g.seconds) : (t("sacem_roi_no_time")||"Temps non suivi")) + '</div>'
-          + (g.perHourPerYear !== null ? '<div style="font-size:10px;color:#A78BFA;font-weight:700;margin-top:2px">' + g.perHourPerYear.toFixed(2) + ' ' + (t("sacem_roi_per_hour")||"€/h/an") + '</div>' : '')
+          + '<div style="font-size:11px;color:#10B981;font-weight:700">' + g.displayedRevenue.toFixed(2) + ' €' + (gridYearFilter ? ' <span style="color:#5B5880;font-weight:600">(' + gridYearFilter + ')</span>' : '') + '</div>'
+          + (gridYearFilter ? '' :
+              '<div style="font-size:10px;color:#60A5FA">' + (g.seconds > 0 ? formatLogicDuration(g.seconds) : (t("sacem_roi_no_time")||"Temps non suivi")) + '</div>'
+              + (g.perHourPerYear !== null ? '<div style="font-size:10px;color:#A78BFA;font-weight:700;margin-top:2px">' + g.perHourPerYear.toFixed(2) + ' ' + (t("sacem_roi_per_hour")||"€/h/an") + '</div>' : ''))
           + '</div>'
           + '</div>';
       }).join("");
@@ -5903,11 +6005,21 @@ function renderSacemPage() {
           if (!trackYearMap[tid]) {
             const proj = (S.projects||[]).find(p=>p.id===e.matchedProjectId);
             const track = proj && proj.tracks.find(t=>t.id===tid);
-            trackYearMap[tid] = { title: track ? (track.title||"Sans titre") : "?", total: 0, byYear: {} };
+            trackYearMap[tid] = { title: track ? (track.title||"Sans titre") : "?", total: 0, byYear: {}, showMap: new Map() };
           }
           trackYearMap[tid].total += (e.montantNet || 0);
           const y = e.year || "?";
           trackYearMap[tid].byYear[y] = (trackYearMap[tid].byYear[y] || 0) + (e.montantNet || 0);
+          // Détail par show/placement — même donnée que dans le classement
+          // Rentabilité, mais directement accessible ici pour éviter d'avoir
+          // à changer d'onglet pour voir où une track a été diffusée.
+          (e.details||[]).forEach(d => {
+            if (!d.titreLie && !d.pays && !d.typeUtil && !d.utilisateurs) return;
+            const dkey = (d.titreLie||"") + "|" + (d.pays||"") + "|" + (d.typeUtil||"") + "|" + (d.utilisateurs||"");
+            const cur = trackYearMap[tid].showMap.get(dkey) || { titreLie: d.titreLie, pays: d.pays, typeUtil: d.typeUtil, utilisateurs: d.utilisateurs, montantNet: 0 };
+            cur.montantNet += (d.montantNet || 0);
+            trackYearMap[tid].showMap.set(dkey, cur);
+          });
         });
         // Sélecteur d'année — "Total" (tous les revenus de la track sur
         // l'album, tous exercices confondus) ou une année précise (classe
@@ -5927,18 +6039,34 @@ function renderSacemPage() {
         const trackArr = trackArrBase.filter(x => sacemAlbumDetailYear === "all" || x.byYear[sacemAlbumDetailYear]).sort((a,b) => getAmount(b) - getAmount(a));
         const displayedTotal = sacemAlbumDetailYear === "all" ? selectedAlbum.revenue : trackArrBase.reduce((s,x) => s + getAmount(x), 0);
         const maxTrackTotal = Math.max(0, ...trackArr.map(x => getAmount(x)));
+        let albumTrackRowIdx = 0;
         const trackRowsHtml = trackArr.length ? trackArr.map(x => {
           const amount = getAmount(x);
           const yearsHtml = sacemAlbumDetailYear === "all" ? Object.keys(x.byYear).sort().reverse().map(y =>
             '<span style="display:inline-block;background:#1E1C38;border-radius:100px;padding:3px 10px;font-size:11px;color:#7B78A8;margin-right:6px;margin-top:6px">' + y + ' : <span style="color:#A78BFA;font-weight:700">' + x.byYear[y].toFixed(2) + ' €</span></span>'
           ).join("") : "";
+          // Détail par show/placement — accordéon repliable, même info que
+          // dans le classement Rentabilité mais directement ici pour éviter
+          // d'avoir à changer d'onglet et rechercher la track.
+          const showDetails = Array.from(x.showMap.values()).sort((a,b) => b.montantNet - a.montantNet);
+          const hasShows = showDetails.length > 0;
+          const rowId = "sacem-album-track-shows-" + (albumTrackRowIdx++);
+          const maxShowAmount = hasShows ? Math.max(0, ...showDetails.map(d => d.montantNet)) : 0;
+          const showsRowsHtml = hasShows ? showDetails.map(d =>
+            '<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #1E1C38;font-size:11px">'
+            + '<span style="color:#C4C0E8;flex:1;display:inline-flex;align-items:center;gap:4px">' + (d.titreLie ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M20.2 6L3 11l-.9-2.4c-.3-1.1.4-2.2 1.5-2.5L18.8 2c1.1-.3 2.2.4 2.5 1.5L20.2 6z"/><path d="M3 11l17.2-5"/><path d="M3 11v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9"/><line x1="7.5" y1="6.5" x2="9.5" y2="10"/><line x1="12" y1="5.3" x2="14" y2="8.8"/></svg><span>' + escapeHtml(d.titreLie) + '</span>' : (t("sacem_no_show")||"Show non renseigné")) + '</span>'
+            + '<span style="color:#5B5880;white-space:nowrap">' + [d.typeUtil, d.utilisateurs, d.pays].filter(Boolean).map(escapeHtml).join(" · ") + '</span>'
+            + '<span style="color:' + sacemAmountColor(d.montantNet, maxShowAmount) + ';font-weight:700;white-space:nowrap">' + d.montantNet.toFixed(2) + ' €</span>'
+            + '</div>'
+          ).join("") : '';
           return '<div style="padding:14px 0;border-bottom:1px solid #1E1C38">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
-            + '<span style="font-size:15px;color:#F0EEF8;font-weight:700">' + escapeHtml(x.title) + '</span>'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px' + (hasShows ? ';cursor:pointer' : '') + '"' + (hasShows ? ' onclick="toggleSacemGroupDetails(\'' + rowId + '\', this)"' : '') + '>'
+            + '<span style="font-size:15px;color:#F0EEF8;font-weight:700;display:inline-flex;align-items:center;gap:6px">' + (hasShows ? '<span style="color:#5B5880;font-size:11px;transition:transform 0.15s" class="sacem-chevron">▶</span>' : '') + escapeHtml(x.title) + '</span>'
             + '<span style="font-size:16px;font-weight:800;color:' + sacemAmountColor(amount, maxTrackTotal) + '">' + amount.toFixed(2) + ' €</span>'
             + '</div>'
             + '<div style="height:7px;background:#1E1C38;border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;width:' + (maxTrackTotal ? Math.max(4, Math.round(amount/maxTrackTotal*100)) : 0) + '%;background:linear-gradient(90deg,#7C3AED,#A78BFA);border-radius:3px"></div></div>'
             + (yearsHtml ? '<div>' + yearsHtml + '</div>' : '')
+            + (hasShows ? '<div id="' + rowId + '" style="display:none;padding:10px 0 0 17px">' + showsRowsHtml + '</div>' : '')
             + '</div>';
         }).join("") : '<div style="font-size:13px;color:#5B5880">' + (sacemAlbumDetailYear === "all" ? (t("sacem_album_no_track_detail")||"Aucune track reliée pour cet album pour l'instant.") : (t("sacem_album_no_track_year")||"Aucune track n'a rapporté sur cette année pour cet album.")) + '</div>';
 
@@ -6570,6 +6698,18 @@ function buildProjBody(p) {
         <div class="pill-select">${statusPills}</div>
         <div style="margin-top:12px;font-size:10px;color:#7B78A8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">Deadline</div>
         ${buildDateSelect('proj-deadline-'+p.id, p.deadline||"", `setProjField(${p.id},"deadline",v)`)}
+        <div style="margin-top:10px;font-size:10px;color:#7B78A8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px" title="${t('proj_created_bulk_hint')||'Sert pour les statistiques annuelles — indépendant de la deadline. Applique la même année à toutes les tracks de cet album.'}">${t('proj_created_bulk')||'Année de production (toutes les tracks)'}</div>
+        <select class="inp" id="proj-created-year-${p.id}" style="font-size:12px;padding:5px 8px" onchange="setAlbumCreatedBulk(${p.id},this.value)">
+          <option value="">--</option>
+          ${(() => {
+            const cy=new Date().getFullYear();
+            const projCreatedYear = p.tracks && p.tracks[0] && p.tracks[0].created ? String(new Date(p.tracks[0].created).getFullYear()) : "";
+            let opts="";
+            for(let y=cy+2;y>=cy-6;y--) opts+=`<option value="${y}"${String(y)===projCreatedYear?" selected":""}>${y}</option>`;
+            return opts;
+          })()}
+        </select>
+        <button onclick="spreadAlbumCreatedToDeadline(${p.id})" title="${t('proj_created_spread_hint')||'Répartit uniformément les dates de création des tracks entre le 1er janvier et la deadline, pour un graphique de production mensuelle plus réaliste (approximation, pas les vraies dates).'}" style="margin-top:5px;background:transparent;border:none;color:#7B78A8;font-size:10px;text-decoration:underline;cursor:pointer;padding:0">${t('proj_created_spread')||'↔ Répartir les dates jusqu\'à la deadline'}</button>
         <div style="margin-top:10px;font-size:10px;color:#7B78A8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">${t("proj_publisher")}</div>
         <input type="text" class="inp" value="${p.editeur||""}" placeholder="${t('proj_publisher')}…" style="font-size:12px;padding:5px 8px"
           onchange="setProjField(${p.id},'editeur',this.value)">
@@ -7308,6 +7448,59 @@ function setProjField(pid,field,val) {
     else renderProjects();
   }
 }
+// Applique une année de production à TOUTES les tracks de l'album en une
+// fois — sert à corriger un album déjà créé dont les tracks ont hérité de la
+// date du jour (moment où l'album a été ajouté dans l'appli) plutôt que de
+// leur vraie année de production, ce qui fausse les stats annuelles (objectifs,
+// briefing) qui se basent sur trk.created. On ne change QUE l'année : le
+// mois/jour existant de chaque track est conservé (et à défaut, celui
+// d'aujourd'hui est utilisé) pour ne pas fausser les graphiques de
+// production mensuelle ni les calculs de durée composition→livraison, qui
+// eux se basent sur le mois réel de trk.created.
+function setAlbumCreatedBulk(pid, year) {
+  if(!year) return;
+  const p = S.projects.find(x=>String(x.id)===String(pid)); if(!p) return;
+  p.tracks.forEach(trk => {
+    const base = trk.created ? new Date(trk.created) : new Date();
+    if(isNaN(base.getTime())) { trk.created = `${year}-01-01`; return; }
+    base.setFullYear(parseInt(year,10));
+    trk.created = base.toISOString().split("T")[0];
+  });
+  expandedProj = p.id;
+  save();
+  if(currentPage==="dashboard") renderDashboard();
+  else renderProjects();
+  showUndoToast(ICON_CHECK + (t("proj_created_bulk_done")||"Date de composition appliquée à toutes les tracks"), true);
+}
+
+// Lissage visuel : répartit uniformément les dates de création des tracks
+// entre le 1er janvier de l'année de production et la deadline de l'album.
+// Utile quand les vraies dates ont été perdues (ex: après un setAlbumCreatedBulk
+// qui les a toutes remises au 1er janvier) — ce ne sont PAS les vraies dates,
+// juste une approximation pour que le graphique de production mensuelle ne
+// soit plus artificiellement concentré sur un seul mois.
+function spreadAlbumCreatedToDeadline(pid) {
+  const p = S.projects.find(x=>String(x.id)===String(pid)); if(!p) return;
+  if(!p.tracks || !p.tracks.length) return;
+  const refYear = p.tracks[0].created ? new Date(p.tracks[0].created).getFullYear() : new Date().getFullYear();
+  let start = new Date(refYear, 0, 1);
+  let end = p.deadline ? new Date(p.deadline) : null;
+  if(!end || isNaN(end.getTime()) || end <= start) {
+    // Pas de deadline exploitable après le 1er janvier → on étale sur l'année entière à la place.
+    end = new Date(refYear, 11, 31);
+  }
+  const n = p.tracks.length;
+  const span = end.getTime() - start.getTime();
+  p.tracks.forEach((trk, i) => {
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    trk.created = new Date(start.getTime() + span * t).toISOString().split("T")[0];
+  });
+  expandedProj = p.id;
+  save();
+  if(currentPage==="dashboard") renderDashboard();
+  else renderProjects();
+  showUndoToast(ICON_CHECK + (t("proj_created_spread_done")||"Dates réparties jusqu'à la deadline (approximation)"), true);
+}
 function setProjDesc(pid,v) {
   const p=S.projects.find(x=>String(x.id)===String(pid)); if(!p) return;
   p.desc=v; save();
@@ -7936,6 +8129,16 @@ function openNewProjectModal() {
   document.getElementById("m-title").value="";
   document.getElementById("m-deadline").value="";
   document.getElementById("m-deadline-wrap").innerHTML = buildDateSelect("m-deadline-sel", "", `document.getElementById("m-deadline").value=v`);
+  const createdYearSel = document.getElementById("m-created-year");
+  if(createdYearSel && createdYearSel.options.length <= 1) {
+    const curYear = new Date().getFullYear();
+    for(let y=curYear+2; y>=curYear-6; y--) {
+      const opt = document.createElement("option");
+      opt.value = y; opt.textContent = y;
+      createdYearSel.appendChild(opt);
+    }
+  }
+  if(createdYearSel) createdYearSel.value = "";
   document.getElementById("m-editeur").value="";
   document.getElementById("m-genre").value="";
   document.getElementById("m-desc").value="";
@@ -7968,7 +8171,15 @@ function createProject(){
   if(!title||!deadline){alert("Titre et deadline requis");return;}
   const n=parseInt(document.getElementById("m-track-count").value)||1;
   const prefix=document.getElementById("m-track-prefix").value||"Track";
-  const tracks=Array.from({length:n},(_,i)=>({id:newId(),title:`${prefix} ${String(i+1).padStart(2,"0")}`,status:"composition",bpm:"",key:"",duration:"",created:new Date().toISOString().split("T")[0],delivered:"",notes:""}));
+  const createdYear=document.getElementById("m-created-year").value;
+  // On ne force PAS le 1er janvier : seule l'année compte pour "année de
+  // production", le mois/jour reste celui d'aujourd'hui pour ne pas fausser
+  // les graphiques de production mensuelle (qui, eux, se basent sur le mois
+  // réel de trk.created).
+  const createdDateObj = new Date();
+  if(createdYear) createdDateObj.setFullYear(parseInt(createdYear,10));
+  const createdDate = createdDateObj.toISOString().split("T")[0];
+  const tracks=Array.from({length:n},(_,i)=>({id:newId(),title:`${prefix} ${String(i+1).padStart(2,"0")}`,status:"composition",bpm:"",key:"",duration:"",created:createdDate,delivered:"",notes:""}));
   S.projects.push({id:newId(),title,type:document.getElementById("m-type").value,deadline,editeur:document.getElementById("m-editeur").value,genre:document.getElementById("m-genre").value,desc:document.getElementById("m-desc").value,status:modalStatus,tracks});
   save(); closeModal("proj-modal");
   showPage("projects");
@@ -8270,15 +8481,33 @@ function renderCalendar(){
     const d=el("div","cal-day"+(isToday?" today":""));
     d.innerHTML=`<div class="cal-day-num">${day}</div>`;
     const dateStr=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    // Deadlines
+    // Deadlines — surlignées selon l'urgence (même logique que les notifications :
+    // rouge ≤7j ou en retard, orange ≤15j, jaune ≤30j, vert au-delà).
+    let cellUrgentColor = null, cellUrgentRank = 4;
     S.projects.filter(p=>p.deadline===dateStr).forEach(p=>{
       const cfg=PROJ_STATUSES[p.status]||PROJ_STATUSES.draft;
+      const isPending = p.status!=="accepted";
+      const urgColor = isPending ? deadlineColor(p.deadline) : null;
       const ev=el("div","cal-event");
-      ev.style.background=cfg.bg; ev.style.color=cfg.color;
+      if(urgColor) {
+        ev.style.background=urgColor+"26";
+        ev.style.color=urgColor;
+        ev.style.border=`1px solid ${urgColor}88`;
+        const rank = urgColor==="#F87171"?0:urgColor==="#FB923C"?1:urgColor==="#FBBF24"?2:3;
+        if(rank < cellUrgentRank) { cellUrgentRank = rank; cellUrgentColor = urgColor; }
+      } else {
+        ev.style.background=cfg.bg; ev.style.color=cfg.color;
+      }
       ev.textContent=p.title;
-      ev.title=p.title+" — Deadline";
+      const dLeft = daysUntil(p.deadline);
+      ev.title=p.title+" — Deadline"+(urgColor?` (${dLeft<0?"en retard":"J-"+dLeft})`:"");
       d.appendChild(ev);
     });
+    // Petite surbrillance de la case elle-même si elle contient une deadline urgente (≤30j ou en retard).
+    if(cellUrgentColor && cellUrgentRank<=2) {
+      d.style.boxShadow = `inset 0 0 0 1px ${cellUrgentColor}, 0 0 10px -3px ${cellUrgentColor}`;
+      if(!isToday) d.style.background = `${cellUrgentColor}14`;
+    }
     // Delivered tracks
     allTracks().filter(t=>t.delivered===dateStr).forEach(t=>{
       const ev=el("div","cal-event");
@@ -8365,7 +8594,10 @@ function renderStatsYear() {
   const total = yTracks.length;
   const valid = yTracks.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
   const refused = yTracks.filter(t=>t.status==="refused").length;
-  const rate = total?Math.round(valid/total*100):0;
+  // Le taux d'acceptation ne compte que les tracks déjà envoyées (exclut celles
+  // encore en composition, qui n'ont pas encore été soumises à un éditeur).
+  const submittedForRate = yTracks.filter(t=>t.status!=="composition").length;
+  const rate = submittedForRate?Math.round(valid/submittedForRate*100):0;
   const albums = S.projects.filter(p=>{
     const d=new Date(p.deadline); return d.getFullYear()===year && p.status==="accepted";
   }).length;
@@ -8386,7 +8618,8 @@ function renderStatsYear() {
       const p  = mt.length;
       const v  = mt.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
       const r  = mt.filter(t=>t.status==="refused").length;
-      const rt = p?Math.round(v/p*100):0;
+      const subM = mt.filter(t=>t.status!=="composition").length;
+      const rt = subM?Math.round(v/subM*100):0;
       return {p,v,r,rt,mt};
     };
 
@@ -8466,7 +8699,7 @@ function renderStatsYear() {
       <!-- Tableau récap -->
       <div style="background:#1A1838;border:1px solid #2A2750;border-radius:10px;overflow:hidden">
         <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 80px;background:#13122A;padding:10px 16px;font-size:10px;color:#5B5880;font-weight:700;text-transform:uppercase;letter-spacing:0.08em">
-          <div>Mois</div><div style="text-align:center">Prod.</div><div style="text-align:center">Valid.</div><div style="text-align:center">Refus.</div><div style="text-align:center">${t("stats_rate_label")}</div>
+          <div>${t("stats_col_month")}</div><div style="text-align:center">${t("stats_col_prod")}</div><div style="text-align:center">${t("stats_col_valid")}</div><div style="text-align:center">${t("stats_col_refused")}</div><div style="text-align:center">${t("stats_rate_label")}</div>
         </div>
         ${MONTHS.map((m,mi)=>{
           const ms = getMonthStats(mi);
@@ -8486,7 +8719,7 @@ function renderStatsYear() {
           </div>`;
         }).join("")}
         <div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 80px;padding:12px 16px;border-top:2px solid #7C3AED33;background:#13122A">
-          <div style="font-size:12px;font-weight:800;color:#C4B5FD">Total ${year}</div>
+          <div style="font-size:12px;font-weight:800;color:#C4B5FD">${t("stats_total_label")} ${year}</div>
           <div style="text-align:center;font-size:14px;font-weight:900;color:#A78BFA">${total}</div>
           <div style="text-align:center;font-size:14px;font-weight:900;color:#10B981">${valid}</div>
           <div style="text-align:center;font-size:14px;font-weight:900;color:#F87171">${refused}</div>
@@ -8556,16 +8789,16 @@ function renderStatsYear() {
     </div>
     <!-- Évolution -->
     <div style="background:#1E1650;border:1px solid #7C3AED33;border-radius:10px;padding:12px 20px;margin-bottom:16px">
-      <div style="font-size:10px;color:#7B78A8;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Évolution ${cmpYear} → ${year}</div>
+      <div style="font-size:10px;color:#7B78A8;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">${t("stats_evolution_label")} ${cmpYear} → ${year}</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
-        <div><div style="font-size:10px;color:#5B5880;margin-bottom:4px">Tracks</div>${diff(cmpTotal,total)}</div>
+        <div><div style="font-size:10px;color:#5B5880;margin-bottom:4px">${t("stats_tracks_word")}</div>${diff(cmpTotal,total)}</div>
         <div><div style="font-size:10px;color:#5B5880;margin-bottom:4px">${t("stat_approved")}</div>${diff(cmpValid,valid)}</div>
         <div><div style="font-size:10px;color:#5B5880;margin-bottom:4px">${t("stat_refused")}</div>${diff(cmpRefused,refused)}</div>
         <div><div style="font-size:10px;color:#5B5880;margin-bottom:4px">${t("stats_rate_label")}</div>${diff(cmpRate,rate,true)}</div>
       </div>
     </div>`:`
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-card-val" style="color:#C4B5FD">${total}</div><div class="stat-card-lbl">Tracks ${year}</div></div>
+      <div class="stat-card"><div class="stat-card-val" style="color:#C4B5FD">${total}</div><div class="stat-card-lbl">${t("stats_tracks_word")} ${year}</div></div>
       <div class="stat-card"><div class="stat-card-val" style="color:#10B981">${valid}</div><div class="stat-card-lbl">${t("stat_approved")}</div></div>
       <div class="stat-card refused-stat-card" data-scope="year" data-year="${year}"><div class="stat-card-val" style="color:#F87171">${refused}</div><div class="stat-card-lbl">${t("stat_refused")} ⓘ</div></div>
       <div class="stat-card stat-tip" data-tip="${valid} ${t('chart_approved')||'validated'} / ${total} ${t('chart_produced')||'produced'}"><div class="stat-card-val" style="color:#FBBF24">${rate}%</div><div class="stat-card-lbl">${t("stats_rate_label")} ⓘ</div></div>
@@ -8627,7 +8860,7 @@ function buildChartBars(barsId, tooltipId, year, tracks, curM) {
       wrap.style.opacity="1"; group.querySelectorAll(".chart-bar").forEach(b=>b.style.filter="brightness(1.3)");
       tooltip.innerHTML=`
         <div style="font-size:11px;font-weight:800;color:#C4B5FD;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em">${MONTHS[i]} ${year}</div>
-        ${[[prod,"#A78BFA",t("chart_produced")],[valM,"#10B981",t("chart_approved")],[refM,"#F87171",t("chart_rejected")],[inProg,"#38BDF8","En cours"]].map(([v,c,l])=>`
+        ${[[prod,"#A78BFA",t("chart_produced")],[valM,"#10B981",t("chart_approved")],[refM,"#F87171",t("chart_rejected")],[inProg,"#38BDF8",t("chart_inprog")]].map(([v,c,l])=>`
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
           <div style="width:8px;height:8px;border-radius:2px;background:${c};flex-shrink:0"></div>
           <span style="color:#C4C0E8;flex:1">${l}</span><span style="font-weight:800;color:${c}">${v}</span>
@@ -8753,7 +8986,11 @@ function renderPublishers() {
   });
 
   let publishers = Object.entries(pubMap)
-    .map(([name,d]) => ({name, ...d, rate: d.tracks.length ? Math.round(d.validated/d.tracks.length*100) : 0}))
+    .map(([name,d]) => {
+      // Exclut les tracks encore en composition (jamais envoyées) du calcul du taux d'acceptation.
+      const submittedForRate = d.tracks.filter(x=>x.status!=="composition").length;
+      return {name, ...d, rate: submittedForRate ? Math.round(d.validated/submittedForRate*100) : 0};
+    })
     .sort((a,b) => b.tracks.length - a.tracks.length);
 
   if(q) publishers = publishers.filter(p => p.name.toLowerCase().includes(q));
@@ -9336,7 +9573,7 @@ function renderStatsCollabs() {
       <div style="margin-bottom:20px">
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-card-val" style="color:#C4B5FD">${filtered.length}</div><div class="stat-card-lbl">${filtered.length>1?t("collabs_count_pl")||"Collaborateurs":t("collabs_count")||"Collaborateur"}</div></div>
-          <div class="stat-card"><div class="stat-card-val" style="color:#10B981">${filtered.reduce((s,c)=>s+c.trackCount,0)}</div><div class="stat-card-lbl">Collaborations</div></div>
+          <div class="stat-card"><div class="stat-card-val" style="color:#10B981">${filtered.reduce((s,c)=>s+c.trackCount,0)}</div><div class="stat-card-lbl">${t("collabs_total")}</div></div>
           <div class="stat-card"><div class="stat-card-val" style="color:#FBBF24">${filtered[0]?.name||"—"}</div><div class="stat-card-lbl">${t("collabs_most")||"Plus actif"}</div></div>
         </div>
       </div>
@@ -9351,10 +9588,11 @@ function renderStatsCollabs() {
             const barW = Math.round(c.trackCount/(filtered[0]?.trackCount||1)*100);
             const validated = c.trackObjs.filter(x=>["validated","delivered"].includes(x.track.status)).length;
             const refused = c.trackObjs.filter(x=>x.track.status==="refused").length;
-            const rate = c.trackCount ? Math.round(validated/c.trackCount*100) : 0;
+            const submittedForRate = c.trackObjs.filter(x=>x.track.status!=="composition").length;
+            const rate = submittedForRate ? Math.round(validated/submittedForRate*100) : 0;
             const info = (S.collabsInfo||{})[c.name] || {};
             const avatar = info.photo
-              ? `<img src="${info.photo}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`
+              ? `<img src="${info.photo}" draggable="false" style="width:100%;height:100%;object-fit:cover;-webkit-user-drag:none;pointer-events:none" onerror="this.style.display='none'">`
               : `<span style="font-size:16px;font-weight:800;color:${col}">${c.name.charAt(0).toUpperCase()}</span>`;
             return `
             <div style="border-top:1px solid #2A2750">
@@ -9374,10 +9612,7 @@ function renderStatsCollabs() {
                     ${info.role ? `<span style="font-size:10px;color:${col};background:${col}18;padding:1px 7px;border-radius:100px;font-weight:600">${info.role}</span>` : ''}
                     ${info.city ? `<span style="font-size:10px;color:#5B5880">· ${info.city}</span>` : ''}
                   </div>
-                  <div style="font-size:11px;color:#5B5880;display:flex;gap:10px;flex-wrap:wrap">
-                    ${info.email ? `<a href="mailto:${info.email}" onclick="event.stopPropagation()" style="color:#60A5FA;text-decoration:none">${info.email}</a>` : ''}
-                    ${info.instagram ? `<span>@${info.instagram.replace('@','')}</span>` : ''}
-                  </div>
+                  ${collabContactIconsHtml(info)}
                   <div style="display:flex;gap:10px;margin-top:4px;font-size:11px">
                     <span style="color:#10B981">✓ ${validated}</span>
                     <span style="color:#F87171">✗ ${refused}</span>
@@ -9429,12 +9664,77 @@ function openCollabLink(inputId) {
   }
   window.open(url, '_blank');
 }
+function openRawUrl(url) {
+  if(!url) return;
+  if(!url.startsWith('http')) url = 'https://' + url;
+  if(window.require) {
+    try { window.require('electron').shell.openExternal(url); return; } catch(e) {}
+  }
+  window.open(url, '_blank');
+}
+// Petites icônes de contact pour la bande collaborateur (sans texte brut affiché,
+// juste l'icône + le nom de la plateforme au survol via title="").
+function collabContactIconsHtml(info) {
+  const ICONS = {
+    email:     '<path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/>',
+    phone:     '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
+    website:   '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    facebook:  '<path d="M15 3h-2a5 5 0 0 0-5 5v2H6v4h2v7h4v-7h2.5l.5-4H12V8a1 1 0 0 1 1-1h2z"/>',
+    instagram: '<rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/>',
+    spotify:   '<circle cx="12" cy="12" r="10"/><path d="M7 10.5c3.2-.9 6.8-.6 9.5.9M7.5 13.5c2.6-.7 5.6-.5 7.8.7M8 16.3c2-.5 4.3-.4 6 .5" fill="none"/>',
+  };
+  const isEN = currentLang === 'en';
+  const items = [
+    info.email     ? { key:'email',     label: isEN?'Email':'Email',                     action:`window.location.href='mailto:${info.email}'` } : null,
+    info.phone     ? { key:'phone',     label: isEN?'Phone':'Téléphone',                 action:`window.location.href='tel:${info.phone.replace(/\s+/g,'')}'` } : null,
+    info.website   ? { key:'website',   label: isEN?'Website':'Site web',                action:`openRawUrl('${info.website.replace(/'/g,"\\'")}')` } : null,
+    info.facebook  ? { key:'facebook',  label: 'Facebook',                               action:`openRawUrl('${info.facebook.replace(/'/g,"\\'")}')` } : null,
+    info.instagram ? { key:'instagram', label: 'Instagram',                              action:`openRawUrl('${info.instagram.replace(/'/g,"\\'")}')` } : null,
+    info.spotify   ? { key:'spotify',   label: 'Spotify / SoundCloud',                   action:`openRawUrl('${info.spotify.replace(/'/g,"\\'")}')` } : null,
+  ].filter(Boolean);
+  if(!items.length) return '';
+  return `<div style="display:flex;gap:7px;margin-top:6px">${items.map(it => `
+    <div onclick="event.stopPropagation();${it.action}"
+      onmouseover="this.style.color='#A78BFA';this.style.borderColor='#7C3AED';showQuickTip(this,'${it.label.replace(/'/g,"\\'")}')"
+      onmouseout="this.style.color='#7B78A8';this.style.borderColor='#2A2750';hideQuickTip()"
+      style="width:30px;height:30px;border-radius:7px;background:#13122A;border:1px solid #2A2750;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#7B78A8;transition:all 0.15s">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[it.key]}</svg>
+    </div>`).join('')}</div>`;
+}
+// Tooltip custom instantané (le title="" natif a un délai fixe imposé par l'OS
+// qu'on ne peut pas raccourcir) — apparaît immédiatement au survol.
+function showQuickTip(el, text) {
+  let tip = document.getElementById('quick-tip');
+  if(!tip) {
+    tip = document.createElement('div');
+    tip.id = 'quick-tip';
+    tip.style.cssText = "position:fixed;background:#1A1838;border:1px solid #7C3AED;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;color:#E2E0F0;pointer-events:none;z-index:99999;white-space:nowrap;opacity:0;transition:opacity 0.06s";
+    document.body.appendChild(tip);
+  }
+  tip.textContent = text;
+  const r = el.getBoundingClientRect();
+  tip.style.left = (r.left + r.width/2) + "px";
+  tip.style.top = (r.top - 8) + "px";
+  tip.style.transform = "translate(-50%,-100%)";
+  tip.style.display = "block";
+  requestAnimationFrame(()=>{ tip.style.opacity = "1"; });
+}
+function hideQuickTip() {
+  const tip = document.getElementById('quick-tip');
+  if(tip) tip.style.opacity = "0";
+}
 
 function openCollabInfo(name) {
   if(!S.collabsInfo) S.collabsInfo = {};
   const info = S.collabsInfo[name] || {};
   document.getElementById('ci-name-display').textContent = name;
-  document.getElementById('ci-avatar-letter').textContent = name.charAt(0).toUpperCase();
+  // ⚠️ Si une photo a déjà été enregistrée, updateCollabPhotoPreview() a remplacé
+  // le <span id="ci-avatar-letter"> par un <img> sans cet id — getElementById
+  // renvoie alors null. Sans cette garde, l'accès à .textContent plantait ici et
+  // empêchait TOUT le reste de la fonction de s'exécuter (dont l'ouverture de la
+  // modale plus bas), rendant la fiche impossible à rouvrir une fois une photo mise.
+  const avatarLetterEl = document.getElementById('ci-avatar-letter');
+  if(avatarLetterEl) avatarLetterEl.textContent = name.charAt(0).toUpperCase();
   document.getElementById('ci-role').value = info.role || '';
   document.getElementById('ci-role-display').textContent = info.role || '';
   document.getElementById('ci-photo').value = info.photo || '';
@@ -9613,7 +9913,8 @@ function renderStatsCompare() {
     const prod = yt.length;
     const valid = yt.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
     const refused = yt.filter(t=>t.status==="refused").length;
-    const rate = prod?Math.round(valid/prod*100):0;
+    const submittedForRate = yt.filter(t=>t.status!=="composition").length;
+    const rate = submittedForRate?Math.round(valid/submittedForRate*100):0;
     return {prod,valid,refused,rate,yt};
   };
 
@@ -9688,21 +9989,21 @@ function renderStatsCompare() {
     <!-- Résumé évolution -->
     ${years.length > 1 ? `
     <div style="background:#13122A;border:1px solid #2A2750;border-radius:10px;padding:14px 20px;margin:12px 0 20px;display:grid;grid-template-columns:1fr repeat(${years.length-1},1fr);gap:12px;align-items:center">
-      <div style="font-size:11px;color:#5B5880;font-weight:700;text-transform:uppercase;letter-spacing:0.08em">Évolution vs ${stats[0].y}</div>
+      <div style="font-size:11px;color:#5B5880;font-weight:700;text-transform:uppercase;letter-spacing:0.08em">${t("stats_evolution_label")} vs ${stats[0].y}</div>
       ${stats.slice(1).map((s,i)=>`
         <div style="text-align:center">
           <div style="font-size:11px;color:${colors[i+1]};font-weight:700;margin-bottom:6px">${s.y}</div>
           <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
             <div style="text-align:center">
-              <div style="font-size:10px;color:#5B5880;margin-bottom:2px">Prod.</div>
+              <div style="font-size:10px;color:#5B5880;margin-bottom:2px">${t("stats_col_prod")}</div>
               <div>${evolBig("prod",i+1)}</div>
             </div>
             <div style="text-align:center">
-              <div style="font-size:10px;color:#5B5880;margin-bottom:2px">Valid.</div>
+              <div style="font-size:10px;color:#5B5880;margin-bottom:2px">${t("stats_col_valid")}</div>
               <div>${evolBig("valid",i+1)}</div>
             </div>
             <div style="text-align:center">
-              <div style="font-size:10px;color:#5B5880;margin-bottom:2px">Taux</div>
+              <div style="font-size:10px;color:#5B5880;margin-bottom:2px">${t("stats_rate_label")}</div>
               <div>${evolBig("rate",i+1)}</div>
             </div>
           </div>
@@ -9756,7 +10057,8 @@ function renderStatsTotal() {
   const total = tracks.length;
   const valid = tracks.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
   const refused = tracks.filter(t=>t.status==="refused").length;
-  const rate = total?Math.round(valid/total*100):0;
+  const submittedForRate = tracks.filter(t=>t.status!=="composition").length;
+  const rate = submittedForRate?Math.round(valid/submittedForRate*100):0;
   const albums = S.projects.filter(p=>p.status==="accepted").length;
 
   // Years breakdown
@@ -9823,7 +10125,8 @@ function renderGoals(){
   const pVal=Math.min(100,g.validate?Math.round(validated/g.validate*100):0);
   const totalAll=allT.length;
   const validAll=allT.filter(t=>["validated","mix","mixsent","delivered"].includes(t.status)).length;
-  const rateAll=totalAll?Math.round(validAll/totalAll*100):0;
+  const submittedAll=allT.filter(t=>t.status!=="composition").length;
+  const rateAll=submittedAll?Math.round(validAll/submittedAll*100):0;
   const monthsElapsed=year===new Date().getFullYear()?Math.max(1,new Date().getMonth()+1):12;
   const rythme=produced/monthsElapsed;
   const moisRestants=year===new Date().getFullYear()?12-new Date().getMonth():0;
@@ -10259,7 +10562,8 @@ function openBriefing() {
   const inProgress = tracks.filter(t=>["composition","sent","revision","mix","mixsent"].includes(t.status)).length;
   const delivered = tracks.filter(t=>t.status==="delivered").length;
   const refused = tracks.filter(t=>t.status==="refused").length;
-  const rate = total ? Math.round(accepted/total*100) : 0;
+  const submittedForRate = tracks.filter(t=>t.status!=="composition").length;
+  const rate = submittedForRate ? Math.round(accepted/submittedForRate*100) : 0;
 
   // Deadlines urgentes
   const urgent1 = S.projects.filter(p=>daysUntil(p.deadline)<=1&&p.status!=="accepted");
