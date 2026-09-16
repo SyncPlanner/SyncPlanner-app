@@ -9,7 +9,6 @@ const { getActiveLogicProjectMetadata, getOpenLogicWindow, getProjectMetadataFor
 // Intervalle de polling Logic Pro (ms) — 5s = bon compromis réactivité/charge
 const LOGIC_POLL_INTERVAL = 5000;
 let logicPollTimer = null;
-let lastLogicSnapshot = null;
 
 function startLogicPolling(win) {
   if (logicPollTimer) clearInterval(logicPollTimer);
@@ -17,15 +16,13 @@ function startLogicPolling(win) {
   logicPollTimer = setInterval(async () => {
     try {
       const data = await getActiveLogicProjectMetadata();
-      const snapshot = JSON.stringify(data);
-
-      // On ne pousse au renderer que si quelque chose a changé
-      // (évite de spammer l'UI toutes les 5s pour rien)
-      if (snapshot !== lastLogicSnapshot) {
-        lastLogicSnapshot = snapshot;
-        if (!win.isDestroyed()) {
-          win.webContents.send('logic-project-update', data);
-        }
+      // On envoie systématiquement à chaque poll : le renderer sait mieux que
+      // nous si une donnée identique doit malgré tout être (re)traitée (ex :
+      // un projet débloqué côté app — statut qui repasse de "terminé" à
+      // "envoyé" — doit re-synchroniser même si les métadonnées Logic elles-
+      // mêmes n'ont pas bougé). Un cache ici ferait perdre ces cas.
+      if (!win.isDestroyed()) {
+        win.webContents.send('logic-project-update', data);
       }
     } catch (e) {
       // Logic pas ouvert / permission pas encore accordée / etc.
